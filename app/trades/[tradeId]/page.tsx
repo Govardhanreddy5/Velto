@@ -1,5 +1,6 @@
 import { checkUserRouting } from "@/lib/profile/actions";
-import { getTradeById } from "@/lib/trades/actions";
+import { getTradeById, getTradeMessages } from "@/lib/trades/actions";
+import { TradeChat } from "@/components/trades/trade-chat";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import {
@@ -11,7 +12,6 @@ import {
   CheckCircle2,
   ShieldCheck,
   ArrowLeft,
-  MessageSquare,
   Lock,
   AlertCircle,
 } from "lucide-react";
@@ -45,7 +45,10 @@ export default async function TradePage({ params }: TradePageProps) {
     redirect("/onboarding");
   }
 
-  const { trade, error } = await getTradeById(tradeId);
+  const [{ trade, error }, { messages }] = await Promise.all([
+    getTradeById(tradeId),
+    getTradeMessages(tradeId),
+  ]);
 
   // If trade not found or user is not a participant
   if (error || !trade) {
@@ -323,37 +326,33 @@ export default async function TradePage({ params }: TradePageProps) {
           </div>
         </div>
 
-        {/* Milestone 6 Preview: Realtime Trade Chat (Placeholder) */}
-        <div className="p-8 bg-white rounded-3xl border border-zinc-200/90 shadow-sm text-center space-y-4">
-          <div className="w-12 h-12 rounded-2xl bg-zinc-100 text-zinc-500 border border-zinc-200 flex items-center justify-center mx-auto">
-            <MessageSquare className="w-6 h-6 text-zinc-600" />
-          </div>
-
-          <div className="space-y-1.5 max-w-md mx-auto">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-zinc-100 text-zinc-700 text-xs font-bold">
-              <Lock className="w-3.5 h-3.5" />
-              Realtime Chat: Milestone 6
+        {/* Private Realtime In-Trade Chat */}
+        <section className="space-y-3">
+          <div className="flex items-center justify-between px-1">
+            <div className="flex items-center gap-2">
+              <h2 className="text-base font-bold text-zinc-950">
+                Meetup Coordination Chat
+              </h2>
+              <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200 flex items-center gap-1">
+                <Lock className="w-3 h-3" />
+                Private
+              </span>
             </div>
-            <h3 className="text-lg font-bold text-zinc-950">
-              Private In-Trade Chat Coming Next
-            </h3>
-            <p className="text-xs text-zinc-500 leading-relaxed">
-              In Milestone 6, you and {partnerName} will be able to exchange live,
-              encrypted instant messages to coordinate exact timing, landmarks, and
-              confirmations right here.
-            </p>
+            <span className="text-xs text-zinc-400">
+              Visible only to you and {partnerName}
+            </span>
           </div>
 
-          <div className="pt-2">
-            <Link
-              href="/feed"
-              className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl border border-zinc-200 text-zinc-700 hover:bg-zinc-50 text-xs font-semibold transition-colors"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              Back to Campus Feed
-            </Link>
-          </div>
-        </div>
+          <TradeChat
+            tradeId={trade.id}
+            initialMessages={messages}
+            currentUserId={currentUserId!}
+            partnerName={partnerName}
+            partnerRole={isRequester ? "Fulfiller" : "Requester"}
+            tradeStatus={trade.status}
+            meetupLocation={trade.meetup_location}
+          />
+        </section>
       </main>
     </div>
   );

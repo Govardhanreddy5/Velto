@@ -2,7 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
-import { Trade } from "@/types/database";
+import { Trade, TradeMessage } from "@/types/database";
 
 export interface AcceptRequestResult {
   success: boolean;
@@ -173,5 +173,142 @@ export async function getTradeById(tradeId: string): Promise<TradeDetailsResult>
   return {
     trade: formatted,
     currentUserId: user.id,
+  };
+}
+
+/**
+ * Server action to retrieve in-trade chat messages.
+ * Only trade participants (requester or fulfiller) can access.
+ */
+export async function getTradeMessages(
+  tradeId: string
+): Promise<{ messages: TradeMessage[]; error?: string }> {
+  const supabase = await createClient();
+
+  if (!supabase) {
+    return { messages: [], error: "Database connection failed." };
+  }
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { messages: [], error: "Authentication required." };
+  }
+
+  const { data, error } = await supabase
+    .from("trade_messages")
+    .select(`
+      id,
+      trade_id,
+      sender_id,
+      message,
+      created_at,
+      sender:profiles!trade_messages_sender_id_fkey(
+        id,
+        full_name,
+        roll_number,
+        department,
+        avatar_url
+      )
+    `)
+    .eq("trade_id", tradeId)
+    .order("created_at", { ascending: true });
+
+  if (error) {
+    console.error("Error fetching trade messages:", error);
+    return { messages: [], error: error.message };
+  }
+
+  const formatted: TradeMessage[] = (data || []).map((m) => ({
+    ...m,
+    sender: Array.isArray(m.sender) ? m.sender[0] : m.sender,
+  }));
+
+  return { messages: formatted };
+}
+
+export interface SendMessageResult {
+  success: boolean;
+  message?: TradeMessage;
+  error?: string;
+}
+
+/**
+ * Server action to send a chat message inside an active trade room.
+ * Enforces text length (1-1000 chars), whitespace trimming, and active trade status.
+ */
+export async function sendTradeMessageAction(
+  tradeId: string,
+  messageText: string
+): Promise<SendMessageResult> {
+  const supabase = await createClient();
+
+  if (!supabase) {
+    return { success: false, error: "Database connection failed." };
+  }
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { success: false, error: "Authentication required to send messages." };
+  }
+
+  const trimmed = (messageText || "").trim();
+
+  if (!trimmed) {
+    return { success: false, error: "Message cannot be empty." };
+  }
+
+  if (trimmed.length > 1000) {
+    return {
+      success: false,
+      error: "Message exceeds maximum length of 1,000 characters.",
+    };
+  }
+
+  // Insert message into trade_messages
+  const { data, error } = await supabase
+    .from("trade_messages")
+    .insert({
+      trade_id: tradeId,
+      sender_id: user.id,
+      message: trimmed,
+    })
+    .select(`
+      id,
+      trade_id,
+      sender_id,
+      message,
+      created_at,
+      sender:profiles!trade_messages_sender_id_fkey(
+        id,
+        full_name,
+        roll_number,
+        department,
+        avatar_url
+      )
+    `)
+    .single();
+
+  if (error) {
+    console.error("Error sending trade message:", error);
+    return {
+      success: false,
+      error: error.message || "Failed to send message.",
+    };
+  }
+
+  const formatted: TradeMessage = {
+    ...data,
+    sender: Array.isArray(data.sender) ? data.sender[0] : data.sender,
+  };
+
+  return {
+    success: true,
+    message: formatted,
   };
 }
