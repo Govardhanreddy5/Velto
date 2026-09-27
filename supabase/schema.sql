@@ -1,34 +1,27 @@
 -- ============================================================
--- VELTO DATABASE SCHEMA
--- Campus-to-Campus Peer-to-Peer Cash ↔ UPI Exchange Platform
+-- VELTO DATABASE SCHEMA (Milestone 1 Complete)
 -- Project: cash-upi swap (csbdbhnvsykrsozwzdwk)
 -- ============================================================
 
--- Enable required extensions
+-- 1. Enable UUID Extension
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- ============================================================
--- 1. ENUMS FOR TYPE SAFETY
--- ============================================================
-CREATE TYPE trade_type AS ENUM ('need_cash', 'have_cash');
-CREATE TYPE request_status AS ENUM ('open', 'matched', 'completed', 'cancelled', 'expired');
-CREATE TYPE trade_status AS ENUM ('in_progress', 'completed', 'disputed', 'cancelled');
-CREATE TYPE report_status AS ENUM ('pending', 'investigating', 'resolved', 'dismissed');
-
--- ============================================================
 -- 2. PROFILES TABLE (Verified Students)
--- Linked directly to Supabase auth.users
--- ============================================================
 CREATE TABLE IF NOT EXISTS public.profiles (
     id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
     email TEXT NOT NULL UNIQUE,
     roll_number TEXT NOT NULL,
     full_name TEXT,
-    phone_number TEXT,
+    department TEXT,
+    year_of_study INTEGER CHECK (year_of_study BETWEEN 1 AND 5),
     upi_id TEXT,
     avatar_url TEXT,
     campus TEXT NOT NULL DEFAULT 'Vishnu Educational Society',
+    is_onboarded BOOLEAN NOT NULL DEFAULT FALSE,
     is_verified BOOLEAN NOT NULL DEFAULT TRUE,
+    is_admin BOOLEAN NOT NULL DEFAULT FALSE,
+    is_suspended BOOLEAN NOT NULL DEFAULT FALSE,
+    is_banned BOOLEAN NOT NULL DEFAULT FALSE,
     rating_avg NUMERIC(3, 2) NOT NULL DEFAULT 5.00,
     total_ratings INTEGER NOT NULL DEFAULT 0,
     total_trades INTEGER NOT NULL DEFAULT 0,
@@ -36,50 +29,52 @@ CREATE TABLE IF NOT EXISTS public.profiles (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- ============================================================
+-- Helper function: Check if user is admin
+CREATE OR REPLACE FUNCTION public.is_admin(user_id UUID)
+RETURNS BOOLEAN AS $$
+BEGIN
+    RETURN EXISTS (
+        SELECT 1 FROM public.profiles
+        WHERE id = user_id AND is_admin = TRUE
+    );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
 -- 3. EXCHANGE REQUESTS TABLE
--- Campus feed for student cash <-> UPI requests
--- ============================================================
 CREATE TABLE IF NOT EXISTS public.exchange_requests (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     requester_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
-    request_type trade_type NOT NULL, -- 'need_cash' (paying UPI) or 'have_cash' (receiving UPI)
-    amount NUMERIC(10, 2) NOT NULL CHECK (amount > 0 AND amount <= 10000), -- Campus-friendly limit
-    location_hint TEXT NOT NULL, -- e.g. "Canteen", "Library Block", "Main Gate"
+    request_type TEXT NOT NULL CHECK (request_type IN ('NEED_CASH', 'HAVE_CASH_WANT_UPI')),
+    amount NUMERIC(10, 2) NOT NULL CHECK (amount >= 20.00 AND amount <= 500.00), -- Strict ₹20–₹500 limit
+    location_hint TEXT NOT NULL,
     note TEXT,
-    status request_status NOT NULL DEFAULT 'open',
+    status TEXT NOT NULL DEFAULT 'OPEN' CHECK (status IN ('OPEN', 'ACCEPTED', 'COMPLETED', 'EXPIRED', 'CANCELLED')),
     campus TEXT NOT NULL DEFAULT 'Vishnu Educational Society',
     expires_at TIMESTAMPTZ NOT NULL DEFAULT (NOW() + INTERVAL '2 hours'),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- ============================================================
 -- 4. TRADES TABLE (Trade Rooms)
--- Active trade between requester and student accepting the request
--- ============================================================
 CREATE TABLE IF NOT EXISTS public.trades (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     request_id UUID NOT NULL REFERENCES public.exchange_requests(id) ON DELETE RESTRICT,
     requester_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE RESTRICT,
-    acceptor_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE RESTRICT,
-    amount NUMERIC(10, 2) NOT NULL,
-    request_type trade_type NOT NULL,
-    status trade_status NOT NULL DEFAULT 'in_progress',
+    fulfiller_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE RESTRICT,
+    amount NUMERIC(10, 2) NOT NULL CHECK (amount >= 20.00 AND amount <= 500.00),
+    request_type TEXT NOT NULL CHECK (request_type IN ('NEED_CASH', 'HAVE_CASH_WANT_UPI')),
+    status TEXT NOT NULL DEFAULT 'IN_PROGRESS' CHECK (status IN ('IN_PROGRESS', 'COMPLETED', 'CANCELLED', 'DISPUTED')),
     meetup_location TEXT NOT NULL,
     requester_confirmed BOOLEAN NOT NULL DEFAULT FALSE,
-    acceptor_confirmed BOOLEAN NOT NULL DEFAULT FALSE,
+    fulfiller_confirmed BOOLEAN NOT NULL DEFAULT FALSE,
     upi_reference TEXT,
     started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     completed_at TIMESTAMPTZ,
     cancelled_at TIMESTAMPTZ,
-    CONSTRAINT different_users CHECK (requester_id <> acceptor_id)
+    CONSTRAINT different_participants CHECK (requester_id <> fulfiller_id)
 );
 
--- ============================================================
 -- 5. TRADE MESSAGES TABLE (Realtime Chat)
--- Secure peer chat inside an active trade room
--- ============================================================
 CREATE TABLE IF NOT EXISTS public.trade_messages (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     trade_id UUID NOT NULL REFERENCES public.trades(id) ON DELETE CASCADE,
@@ -88,10 +83,7 @@ CREATE TABLE IF NOT EXISTS public.trade_messages (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- ============================================================
 -- 6. RATINGS & REVIEWS TABLE
--- Peer trust score and feedback after completed trade
--- ============================================================
 CREATE TABLE IF NOT EXISTS public.trade_ratings (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     trade_id UUID NOT NULL REFERENCES public.trades(id) ON DELETE CASCADE,
@@ -100,35 +92,41 @@ CREATE TABLE IF NOT EXISTS public.trade_ratings (
     rating INTEGER NOT NULL CHECK (rating >= 1 AND rating <= 5),
     comment TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT one_review_per_peer_per_trade UNIQUE (trade_id, reviewer_id)
+    CONSTRAINT one_rating_per_participant UNIQUE (trade_id, reviewer_id),
+    CONSTRAINT no_self_rating CHECK (reviewer_id <> reviewed_id)
 );
 
--- ============================================================
 -- 7. SAFETY REPORTS TABLE
--- Trust, safety & dispute reporting
--- ============================================================
 CREATE TABLE IF NOT EXISTS public.safety_reports (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     reporter_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
     reported_user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
     trade_id UUID REFERENCES public.trades(id) ON DELETE SET NULL,
-    reason TEXT NOT NULL,
+    reason TEXT NOT NULL CHECK (reason IN ('NO_SHOW', 'WRONG_AMOUNT', 'DID_NOT_RECEIVE_CASH', 'DID_NOT_RECEIVE_UPI', 'FRAUD_SUSPICION', 'OTHER')),
     details TEXT,
-    status report_status NOT NULL DEFAULT 'pending',
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    status TEXT NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'INVESTIGATING', 'RESOLVED', 'DISMISSED')),
+    admin_notes TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- ============================================================
--- 8. AUTOMATIC PROFILE TRIGGER ON SIGNUP
--- Automatically creates a student profile when auth.users is created
--- ============================================================
+-- 8. PERFORMANCE INDEXES
+CREATE INDEX IF NOT EXISTS idx_requests_feed ON public.exchange_requests(status, expires_at) WHERE status = 'OPEN';
+CREATE INDEX IF NOT EXISTS idx_requests_requester ON public.exchange_requests(requester_id);
+CREATE INDEX IF NOT EXISTS idx_trades_requester ON public.trades(requester_id);
+CREATE INDEX IF NOT EXISTS idx_trades_fulfiller ON public.trades(fulfiller_id);
+CREATE INDEX IF NOT EXISTS idx_trades_status ON public.trades(status);
+CREATE INDEX IF NOT EXISTS idx_trade_messages_trade ON public.trade_messages(trade_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_trade_ratings_reviewed ON public.trade_ratings(reviewed_id);
+CREATE INDEX IF NOT EXISTS idx_safety_reports_status ON public.safety_reports(status);
+
+-- 9. AUTOMATIC PROFILE TRIGGER ON SIGNUP
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
 DECLARE
     extracted_roll TEXT;
     campus_name TEXT;
 BEGIN
-    -- Extract roll number from user metadata or email prefix (e.g. 24pa1a1210 -> 24PA1A1210)
     extracted_roll := COALESCE(
         NEW.raw_user_meta_data->>'roll_number',
         UPPER(SPLIT_PART(NEW.email, '@', 1))
@@ -162,17 +160,12 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Drop trigger if already exists and recreate
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
     AFTER INSERT ON auth.users
     FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
--- ============================================================
--- 9. ROW LEVEL SECURITY (RLS) POLICIES
--- ============================================================
-
--- Enable RLS on all tables
+-- 10. ROW LEVEL SECURITY (RLS) POLICIES
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.exchange_requests ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.trades ENABLE ROW LEVEL SECURITY;
@@ -180,109 +173,198 @@ ALTER TABLE public.trade_messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.trade_ratings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.safety_reports ENABLE ROW LEVEL SECURITY;
 
--- ----------------- PROFILES POLICIES -----------------
--- Anyone authenticated can view student profiles
-CREATE POLICY "Allow authenticated users to read profiles"
+-- Clean existing policies for idempotency
+DO $$
+DECLARE
+    pol RECORD;
+BEGIN
+    FOR pol IN (SELECT policyname, tablename FROM pg_policies WHERE schemaname = 'public') LOOP
+        EXECUTE format('DROP POLICY IF EXISTS %I ON public.%I', pol.policyname, pol.tablename);
+    END LOOP;
+END $$;
+
+-- PROFILES POLICIES
+CREATE POLICY "profiles_select_authenticated"
     ON public.profiles FOR SELECT
     TO authenticated
     USING (true);
 
--- Students can only update their own profile
-CREATE POLICY "Allow users to update own profile"
+CREATE POLICY "profiles_update_own"
     ON public.profiles FOR UPDATE
     TO authenticated
-    USING (auth.uid() = id);
+    USING (auth.uid() = id)
+    WITH CHECK (auth.uid() = id);
 
--- ----------------- EXCHANGE REQUESTS POLICIES -----------------
--- Any authenticated student can view open exchange requests
-CREATE POLICY "Allow authenticated users to read exchange requests"
+-- REQUESTS POLICIES
+CREATE POLICY "requests_select_feed_or_own"
     ON public.exchange_requests FOR SELECT
     TO authenticated
-    USING (true);
+    USING (
+        (status = 'OPEN' AND expires_at > NOW())
+        OR requester_id = auth.uid()
+        OR public.is_admin(auth.uid())
+    );
 
--- Verified students can create their own request
-CREATE POLICY "Allow students to insert own exchange request"
+CREATE POLICY "requests_insert_own"
     ON public.exchange_requests FOR INSERT
     TO authenticated
-    WITH CHECK (auth.uid() = requester_id);
+    WITH CHECK (
+        auth.uid() = requester_id
+        AND NOT EXISTS (
+            SELECT 1 FROM public.profiles
+            WHERE id = auth.uid() AND (is_banned = TRUE OR is_suspended = TRUE)
+        )
+    );
 
--- Students can update their own request (cancel/edit)
-CREATE POLICY "Allow students to update own request"
+CREATE POLICY "requests_update_own"
     ON public.exchange_requests FOR UPDATE
     TO authenticated
-    USING (auth.uid() = requester_id);
+    USING (auth.uid() = requester_id OR public.is_admin(auth.uid()))
+    WITH CHECK (auth.uid() = requester_id OR public.is_admin(auth.uid()));
 
--- ----------------- TRADES POLICIES -----------------
--- Only the participants (requester or acceptor) can view the trade
-CREATE POLICY "Allow trade participants to view trade"
+-- TRADES POLICIES
+CREATE POLICY "trades_select_participants_or_admin"
     ON public.trades FOR SELECT
     TO authenticated
-    USING (auth.uid() = requester_id OR auth.uid() = acceptor_id);
+    USING (
+        auth.uid() = requester_id 
+        OR auth.uid() = fulfiller_id 
+        OR public.is_admin(auth.uid())
+    );
 
--- Any authenticated user can create/accept a trade
-CREATE POLICY "Allow authenticated users to create trade"
-    ON public.trades FOR INSERT
-    TO authenticated
-    WITH CHECK (auth.uid() = acceptor_id OR auth.uid() = requester_id);
-
--- Trade participants can update trade status (confirm cash / UPI)
-CREATE POLICY "Allow trade participants to update trade"
+CREATE POLICY "trades_update_participants"
     ON public.trades FOR UPDATE
     TO authenticated
-    USING (auth.uid() = requester_id OR auth.uid() = acceptor_id);
+    USING (
+        auth.uid() = requester_id 
+        OR auth.uid() = fulfiller_id 
+        OR public.is_admin(auth.uid())
+    );
 
--- ----------------- TRADE MESSAGES POLICIES -----------------
--- Participants of the trade can read chat messages
-CREATE POLICY "Allow trade participants to read messages"
+CREATE POLICY "trades_insert_participants"
+    ON public.trades FOR INSERT
+    TO authenticated
+    WITH CHECK (
+        (auth.uid() = fulfiller_id OR auth.uid() = requester_id)
+        AND requester_id <> fulfiller_id
+    );
+
+-- TRADE MESSAGES POLICIES
+CREATE POLICY "trade_messages_select_participants"
     ON public.trade_messages FOR SELECT
     TO authenticated
     USING (
         EXISTS (
             SELECT 1 FROM public.trades t
             WHERE t.id = trade_messages.trade_id
-            AND (t.requester_id = auth.uid() OR t.acceptor_id = auth.uid())
+            AND (t.requester_id = auth.uid() OR t.fulfiller_id = auth.uid() OR public.is_admin(auth.uid()))
         )
     );
 
--- Participants of the trade can send messages
-CREATE POLICY "Allow trade participants to send messages"
+CREATE POLICY "trade_messages_insert_participants"
     ON public.trade_messages FOR INSERT
     TO authenticated
     WITH CHECK (
-        auth.uid() = sender_id AND
-        EXISTS (
+        auth.uid() = sender_id
+        AND EXISTS (
             SELECT 1 FROM public.trades t
             WHERE t.id = trade_messages.trade_id
-            AND (t.requester_id = auth.uid() OR t.acceptor_id = auth.uid())
+            AND (t.requester_id = auth.uid() OR t.fulfiller_id = auth.uid())
+            AND t.status = 'IN_PROGRESS'
         )
     );
 
--- ----------------- TRADE RATINGS POLICIES -----------------
-CREATE POLICY "Allow reading ratings"
+-- TRADE RATINGS POLICIES
+CREATE POLICY "trade_ratings_select_all"
     ON public.trade_ratings FOR SELECT
     TO authenticated
     USING (true);
 
-CREATE POLICY "Allow inserting rating as reviewer"
+CREATE POLICY "trade_ratings_insert_eligible"
     ON public.trade_ratings FOR INSERT
     TO authenticated
-    WITH CHECK (auth.uid() = reviewer_id);
+    WITH CHECK (
+        auth.uid() = reviewer_id
+        AND reviewer_id <> reviewed_id
+        AND EXISTS (
+            SELECT 1 FROM public.trades t
+            WHERE t.id = trade_ratings.trade_id
+            AND t.status = 'COMPLETED'
+            AND (
+                (t.requester_id = reviewer_id AND t.fulfiller_id = reviewed_id)
+                OR
+                (t.fulfiller_id = reviewer_id AND t.requester_id = reviewed_id)
+            )
+        )
+    );
 
--- ----------------- SAFETY REPORTS POLICIES -----------------
-CREATE POLICY "Allow users to create safety reports"
+-- SAFETY REPORTS POLICIES
+CREATE POLICY "safety_reports_insert_participant"
     ON public.safety_reports FOR INSERT
     TO authenticated
-    WITH CHECK (auth.uid() = reporter_id);
+    WITH CHECK (
+        auth.uid() = reporter_id
+        AND (
+            trade_id IS NULL
+            OR EXISTS (
+                SELECT 1 FROM public.trades t
+                WHERE t.id = safety_reports.trade_id
+                AND (t.requester_id = reporter_id OR t.fulfiller_id = reporter_id)
+            )
+        )
+    );
 
-CREATE POLICY "Allow reporters to view their own reports"
+CREATE POLICY "safety_reports_select_reporter_or_admin"
     ON public.safety_reports FOR SELECT
     TO authenticated
-    USING (auth.uid() = reporter_id);
+    USING (
+        auth.uid() = reporter_id 
+        OR public.is_admin(auth.uid())
+    );
 
--- ============================================================
--- 10. ENABLE REALTIME
--- ============================================================
--- Enable Supabase Realtime for instant campus live-feed and chat
+CREATE POLICY "safety_reports_update_admin_only"
+    ON public.safety_reports FOR UPDATE
+    TO authenticated
+    USING (public.is_admin(auth.uid()))
+    WITH CHECK (public.is_admin(auth.uid()));
+
+-- 11. SECURE FUNCTION: GET PARTNER UPI ID
+CREATE OR REPLACE FUNCTION public.get_trade_partner_upi(p_trade_id UUID)
+RETURNS TEXT AS $$
+DECLARE
+    v_requester UUID;
+    v_fulfiller UUID;
+    v_partner_id UUID;
+    v_upi TEXT;
+BEGIN
+    SELECT requester_id, fulfiller_id 
+    INTO v_requester, v_fulfiller
+    FROM public.trades
+    WHERE id = p_trade_id;
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Trade not found';
+    END IF;
+
+    IF auth.uid() <> v_requester AND auth.uid() <> v_fulfiller AND NOT public.is_admin(auth.uid()) THEN
+        RAISE EXCEPTION 'Unauthorized';
+    END IF;
+
+    IF auth.uid() = v_requester THEN
+        v_partner_id := v_fulfiller;
+    ELSE
+        v_partner_id := v_requester;
+    END IF;
+
+    SELECT upi_id INTO v_upi
+    FROM public.profiles
+    WHERE id = v_partner_id;
+
+    RETURN v_upi;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- 12. ENABLE REALTIME
 DO $$
 BEGIN
     ALTER PUBLICATION supabase_realtime ADD TABLE public.exchange_requests;
