@@ -12,6 +12,9 @@ import {
   GraduationCap,
   Clock,
   ShieldCheck,
+  ArrowRight,
+  PlusCircle,
+  Radio,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -42,9 +45,12 @@ export default async function DashboardPage() {
   const user = routing.user;
 
   const displayName = profile?.full_name || "Verified Student";
-  const rollNumber = profile?.roll_number || user?.email?.split("@")[0].toUpperCase();
-  const department = profile?.department || "Department not specified";
-  const yearText = profile?.year_of_study ? `Year ${profile.year_of_study}` : "Enrolled";
+  const rollNumber =
+    profile?.roll_number || user?.email?.split("@")[0].toUpperCase();
+  const department = profile?.department || "General Studies";
+  const yearText = profile?.year_of_study
+    ? `Year ${profile.year_of_study}`
+    : "Enrolled";
   const campus = profile?.campus || "Vishnu Educational Society";
   const ratingAvg = Number(profile?.rating_avg || 5.0).toFixed(1);
   const totalTrades = profile?.total_trades || 0;
@@ -55,30 +61,49 @@ export default async function DashboardPage() {
       {/* Top Navbar */}
       <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-zinc-200/80">
         <div className="max-w-5xl mx-auto px-6 h-16 flex items-center justify-between">
-          <Link href="/dashboard" className="flex items-center gap-2">
-            <span className="text-2xl font-bold tracking-tight text-zinc-950">
-              Velto
-            </span>
-            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-100 hidden sm:inline-block">
-              Campus Hub
-            </span>
-          </Link>
-
-          <div className="flex items-center gap-4">
-            <div className="hidden sm:flex items-center gap-2 text-xs">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span className="font-mono font-semibold text-zinc-700">
-                {rollNumber}
+          <div className="flex items-center gap-6">
+            <Link href="/dashboard" className="flex items-center gap-2">
+              <span className="text-2xl font-bold tracking-tight text-zinc-950">
+                Velto
               </span>
+            </Link>
+
+            <nav className="hidden sm:flex items-center gap-4 text-xs font-semibold">
+              <Link
+                href="/dashboard"
+                className="text-blue-600 font-bold"
+              >
+                Dashboard
+              </Link>
+              <Link
+                href="/feed"
+                className="text-zinc-600 hover:text-zinc-950 transition-colors"
+              >
+                Campus Feed
+              </Link>
+            </nav>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <Link
+              href="/feed"
+              className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors border border-emerald-200"
+            >
+              <Radio className="w-3.5 h-3.5 animate-pulse text-emerald-600" />
+              <span className="hidden sm:inline">Campus</span> Feed
+            </Link>
+
+            <div className="hidden md:flex items-center gap-1.5 text-xs font-mono font-semibold text-zinc-700 bg-zinc-100 px-2 py-1 rounded-md">
+              <span>{rollNumber}</span>
             </div>
 
             <form action={signOutAction}>
               <Button
                 variant="outline"
                 type="submit"
-                className="text-xs py-1.5 px-3 h-9 text-zinc-600 hover:text-zinc-950 border-zinc-300"
+                className="text-xs py-1.5 px-3 h-8 text-zinc-600 hover:text-zinc-950 border-zinc-300"
               >
-                <LogOut className="w-3.5 h-3.5 mr-1.5" />
+                <LogOut className="w-3.5 h-3.5 mr-1" />
                 Sign Out
               </Button>
             </form>
@@ -152,11 +177,34 @@ export default async function DashboardPage() {
           </div>
         </div>
 
-        {/* Primary Action Cards (Preview for Milestone 3) */}
+        {/* Live Campus Feed Banner */}
+        <div className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl p-6 text-white flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-lg shadow-blue-500/10">
+          <div className="space-y-1">
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-white/20 text-white backdrop-blur-sm">
+              <Radio className="w-3 h-3 animate-pulse" />
+              Live Campus Exchange
+            </div>
+            <h2 className="text-xl font-bold">Browse Active Requests Nearby</h2>
+            <p className="text-xs text-blue-100 max-w-md">
+              See students across {campus} currently offering or requesting cash
+              in exchange for UPI transfers.
+            </p>
+          </div>
+
+          <Link
+            href="/feed"
+            className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-white text-blue-700 font-bold text-xs hover:bg-blue-50 active:scale-95 transition-all shrink-0 shadow-sm"
+          >
+            Open Campus Feed
+            <ArrowRight className="w-4 h-4" />
+          </Link>
+        </div>
+
+        {/* Primary Action Cards for Creating Requests */}
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-bold text-zinc-950">
-              Campus Cash ↔ UPI Exchange
+              Post an Exchange Request
             </h2>
             <span className="text-xs text-zinc-500">
               Exchange limit: ₹20 – ₹500 per trade
@@ -165,13 +213,13 @@ export default async function DashboardPage() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
             {/* Card 1: Need Cash */}
-            <div className="relative rounded-2xl bg-white border border-zinc-200/90 p-6 shadow-sm flex flex-col justify-between space-y-5 transition-all hover:border-zinc-300">
+            <div className="relative rounded-2xl bg-white border border-zinc-200/90 p-6 shadow-sm flex flex-col justify-between space-y-5 transition-all hover:border-emerald-300 hover:shadow-md">
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold">
                     <Banknote className="w-6 h-6" />
                   </div>
-                  <Badge variant="warning">Coming Soon • Milestone 3</Badge>
+                  <Badge variant="success">Active Feature</Badge>
                 </div>
 
                 <div className="space-y-1">
@@ -179,32 +227,32 @@ export default async function DashboardPage() {
                     Need Physical Cash
                   </h3>
                   <p className="text-xs text-zinc-600 leading-relaxed">
-                    You need cash near the canteen, library or college gate. You
-                    will send an instant UPI transfer to a nearby student who provides
-                    physical cash.
+                    You need cash near the canteen, library, or gate. You will send
+                    an instant UPI payment to a verified student who gives you physical
+                    cash.
                   </p>
                 </div>
               </div>
 
               <div className="pt-2">
-                <button
-                  type="button"
-                  disabled
-                  className="w-full py-2.5 px-4 rounded-lg bg-zinc-100 text-zinc-400 font-semibold text-xs cursor-not-allowed border border-zinc-200 text-center"
+                <Link
+                  href="/requests/new?type=NEED_CASH"
+                  className="inline-flex items-center justify-center gap-2 w-full py-2.5 px-4 rounded-xl bg-emerald-600 text-white font-semibold text-xs hover:bg-emerald-700 active:scale-95 transition-all shadow-sm"
                 >
-                  Create &quot;Need Cash&quot; Request (Milestone 3)
-                </button>
+                  <PlusCircle className="w-4 h-4" />
+                  Create &quot;Need Cash&quot; Request
+                </Link>
               </div>
             </div>
 
             {/* Card 2: Have Cash Want UPI */}
-            <div className="relative rounded-2xl bg-white border border-zinc-200/90 p-6 shadow-sm flex flex-col justify-between space-y-5 transition-all hover:border-zinc-300">
+            <div className="relative rounded-2xl bg-white border border-zinc-200/90 p-6 shadow-sm flex flex-col justify-between space-y-5 transition-all hover:border-blue-300 hover:shadow-md">
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="w-12 h-12 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center font-bold">
                     <Smartphone className="w-6 h-6" />
                   </div>
-                  <Badge variant="warning">Coming Soon • Milestone 3</Badge>
+                  <Badge variant="info">Active Feature</Badge>
                 </div>
 
                 <div className="space-y-1">
@@ -212,20 +260,20 @@ export default async function DashboardPage() {
                     Have Cash → Want UPI
                   </h3>
                   <p className="text-xs text-zinc-600 leading-relaxed">
-                    You have spare physical cash on campus and want money in your
-                    bank account. You give cash and receive an instant UPI payment.
+                    You have spare physical cash and want money in your bank account.
+                    You hand over physical cash and receive an instant UPI payment.
                   </p>
                 </div>
               </div>
 
               <div className="pt-2">
-                <button
-                  type="button"
-                  disabled
-                  className="w-full py-2.5 px-4 rounded-lg bg-zinc-100 text-zinc-400 font-semibold text-xs cursor-not-allowed border border-zinc-200 text-center"
+                <Link
+                  href="/requests/new?type=HAVE_CASH_WANT_UPI"
+                  className="inline-flex items-center justify-center gap-2 w-full py-2.5 px-4 rounded-xl bg-blue-600 text-white font-semibold text-xs hover:bg-blue-700 active:scale-95 transition-all shadow-sm"
                 >
-                  Create &quot;Have Cash&quot; Request (Milestone 3)
-                </button>
+                  <PlusCircle className="w-4 h-4" />
+                  Create &quot;Have Cash&quot; Request
+                </Link>
               </div>
             </div>
           </div>
