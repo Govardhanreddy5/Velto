@@ -3,7 +3,7 @@ const { Client } = require('pg');
 
 async function runMilestone5Tests() {
   const client = new Client({
-    connectionString: 'postgresql://postgres:Govardhan%4055@db.csbdbhnvsykrsozwzdwk.supabase.co:5432/postgres',
+    connectionString: 'postgresql://postgres:YOUR_DB_PASSWORD@db.csbdbhnvsykrsozwzdwk.supabase.co:5432/postgres',
     ssl: { rejectUnauthorized: false },
   });
 
@@ -174,7 +174,7 @@ async function runMilestone5Tests() {
   // Create separate database connections to simulate concurrent clients
   const connPromises = Array.from({ length: 6 }).map(async (_, idx) => {
     const c = new Client({
-      connectionString: 'postgresql://postgres:Govardhan%4055@db.csbdbhnvsykrsozwzdwk.supabase.co:5432/postgres',
+      connectionString: 'postgresql://postgres:YOUR_DB_PASSWORD@db.csbdbhnvsykrsozwzdwk.supabase.co:5432/postgres',
       ssl: { rejectUnauthorized: false },
     });
     await c.connect();

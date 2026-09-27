@@ -3,7 +3,7 @@ const { Client } = require('pg');
 
 async function runMilestone7Tests() {
   const client = new Client({
-    connectionString: 'postgresql://postgres:Govardhan%4055@db.csbdbhnvsykrsozwzdwk.supabase.co:5432/postgres',
+    connectionString: 'postgresql://postgres:YOUR_DB_PASSWORD@db.csbdbhnvsykrsozwzdwk.supabase.co:5432/postgres',
     ssl: { rejectUnauthorized: false },
   });
 
