@@ -59,6 +59,15 @@ npm run build
 
 ---
 
+### Architecture Rules
+
+> **Database & Type Synchronization:**
+> Database enum/constraint values and TypeScript union values must always be kept aligned through explicit migrations. Never change a frontend value without checking the production Supabase schema, and never introduce arbitrary legacy values. Canonical types:
+> * `NEED_CASH`: Requester needs physical cash and pays via UPI.
+> * `HAVE_CASH_WANT_UPI`: Requester has physical cash and wants UPI into bank.
+
+---
+
 ### Development Approach
 
 The application will be developed incrementally.
