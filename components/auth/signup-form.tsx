@@ -154,7 +154,7 @@ export function SignUpForm({ onSuccess, onSwitchToSignIn }: SignUpFormProps) {
         <Input
           type="email"
           label="College Email ID"
-          placeholder="e.g. 24pa1a1210@vishnu.edu.in"
+          placeholder="example@vishnu.edu.in"
           value={email}
           onChange={(e) => {
             setEmail(e.target.value);

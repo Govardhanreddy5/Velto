@@ -41,7 +41,7 @@ export function validateYearOfStudy(year: number | string): { isValid: boolean; 
 }
 
 /**
- * Validates UPI ID format (e.g., student@okaxis, 24pa1a1210@ybl, 9876543210@paytm)
+ * Validates UPI ID format (e.g., student@okaxis, student@ybl, 9876543210@paytm)
  */
 export function validateUpiId(upiId: string): { isValid: boolean; error?: string } {
   const trimmed = upiId?.trim().toLowerCase() ?? "";
@@ -54,7 +54,7 @@ export function validateUpiId(upiId: string): { isValid: boolean; error?: string
   if (!upiRegex.test(trimmed)) {
     return {
       isValid: false,
-      error: "Please enter a valid UPI ID (e.g. yourname@okhdfcbank or 24pa1a1210@ybl).",
+      error: "Please enter a valid UPI ID (e.g. yourname@okhdfcbank or student@ybl).",
     };
   }
 

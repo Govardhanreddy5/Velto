@@ -203,6 +203,7 @@ export async function getFeedRequests(): Promise<{
       requester:profiles!exchange_requests_requester_id_fkey(
         id,
         full_name,
+        avatar_url,
         department,
         year_of_study,
         roll_number,

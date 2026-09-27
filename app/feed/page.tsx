@@ -33,9 +33,12 @@ export default async function FeedPage() {
     getMyRequests(),
   ]);
 
+  const profile = routing.profile;
   const rollNumber =
-    routing.profile?.roll_number ||
-    routing.user?.email?.split("@")[0].toUpperCase();
+    profile?.roll_number ||
+    routing.user?.email?.split("@")[0].toUpperCase() ||
+    "STUDENT";
+  const initialLetter = (profile?.full_name || rollNumber).charAt(0).toUpperCase();
 
   return (
     <div className="min-h-screen bg-zinc-50 text-zinc-900 font-sans">
@@ -82,8 +85,21 @@ export default async function FeedPage() {
               <span className="hidden sm:inline">Post</span> Request
             </Link>
 
-            <div className="hidden md:flex items-center gap-1.5 text-xs font-mono font-semibold text-zinc-600 bg-zinc-100 px-2 py-1 rounded-md">
-              <span>{rollNumber}</span>
+            <div className="flex items-center gap-2">
+              {profile?.avatar_url ? (
+                <img
+                  src={profile.avatar_url}
+                  alt={profile?.full_name || rollNumber}
+                  className="w-7 h-7 rounded-full object-cover border border-zinc-200"
+                />
+              ) : (
+                <div className="w-7 h-7 rounded-full bg-blue-600 text-white text-[11px] font-bold flex items-center justify-center shrink-0">
+                  {initialLetter}
+                </div>
+              )}
+              <div className="hidden md:flex items-center gap-1.5 text-xs font-mono font-semibold text-zinc-600 bg-zinc-100 px-2 py-1 rounded-md">
+                <span>{rollNumber}</span>
+              </div>
             </div>
 
             <form action={signOutAction}>

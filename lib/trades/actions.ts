@@ -126,6 +126,7 @@ export async function getTradeById(tradeId: string): Promise<TradeDetailsResult>
       requester:profiles!trades_requester_id_fkey(
         id,
         full_name,
+        avatar_url,
         department,
         year_of_study,
         roll_number,
@@ -136,6 +137,7 @@ export async function getTradeById(tradeId: string): Promise<TradeDetailsResult>
       fulfiller:profiles!trades_fulfiller_id_fkey(
         id,
         full_name,
+        avatar_url,
         department,
         year_of_study,
         roll_number,

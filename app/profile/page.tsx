@@ -21,6 +21,7 @@ import {
   Shield,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { AvatarPicker } from "@/components/profile/avatar-picker";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -101,6 +102,23 @@ export default async function ProfilePage() {
           </div>
 
           <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              {profile?.avatar_url ? (
+                <img
+                  src={profile.avatar_url}
+                  alt={displayName}
+                  className="w-7 h-7 rounded-full object-cover border border-zinc-200"
+                />
+              ) : (
+                <div className="w-7 h-7 rounded-full bg-blue-600 text-white text-[11px] font-bold flex items-center justify-center shrink-0">
+                  {displayName.charAt(0).toUpperCase()}
+                </div>
+              )}
+              <div className="hidden md:flex items-center gap-1.5 text-xs font-mono font-semibold text-zinc-700 bg-zinc-100 px-2 py-1 rounded-md">
+                <span>{rollNumber}</span>
+              </div>
+            </div>
+
             {profile?.is_admin && (
               <Link
                 href="/admin"
@@ -130,9 +148,17 @@ export default async function ProfilePage() {
         <div className="bg-white rounded-3xl border border-zinc-200/90 p-6 sm:p-8 shadow-sm space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-6">
             <div className="flex items-start gap-5">
-              <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white font-black text-2xl flex items-center justify-center shrink-0 shadow-lg shadow-blue-500/10">
-                {displayName.charAt(0).toUpperCase()}
-              </div>
+              {profile?.avatar_url ? (
+                <img
+                  src={profile.avatar_url}
+                  alt={displayName}
+                  className="w-16 h-16 rounded-2xl object-cover shrink-0 shadow-md border-2 border-white ring-2 ring-blue-500/20"
+                />
+              ) : (
+                <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white font-black text-2xl flex items-center justify-center shrink-0 shadow-lg shadow-blue-500/10">
+                  {displayName.charAt(0).toUpperCase()}
+                </div>
+              )}
 
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
@@ -203,6 +229,29 @@ export default async function ProfilePage() {
             </span>
           </div>
         </div>
+
+        {/* Profile Picture Management Section */}
+        <section className="bg-white rounded-3xl border border-zinc-200/90 p-6 sm:p-8 shadow-sm space-y-4">
+          <div className="flex items-center justify-between border-b border-zinc-100 pb-4">
+            <div>
+              <h2 className="text-base font-bold text-zinc-950">
+                Change Profile Photo
+              </h2>
+              <p className="text-xs text-zinc-500">
+                Upload your campus photo or choose a student avatar. Saves instantly to your profile.
+              </p>
+            </div>
+            <span className="text-[11px] font-semibold text-blue-700 bg-blue-50 px-2.5 py-1 rounded-full border border-blue-200">
+              Campus Visible
+            </span>
+          </div>
+
+          <AvatarPicker
+            currentAvatarUrl={profile?.avatar_url || ""}
+            name={displayName}
+            isStandalone
+          />
+        </section>
 
         {/* Trade History Section */}
         <section className="space-y-4">

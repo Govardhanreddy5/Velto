@@ -99,8 +99,21 @@ export default async function DashboardPage() {
               <span className="hidden sm:inline">Campus</span> Feed
             </Link>
 
-            <div className="hidden md:flex items-center gap-1.5 text-xs font-mono font-semibold text-zinc-700 bg-zinc-100 px-2 py-1 rounded-md">
-              <span>{rollNumber}</span>
+            <div className="flex items-center gap-2">
+              {profile?.avatar_url ? (
+                <img
+                  src={profile.avatar_url}
+                  alt={displayName}
+                  className="w-7 h-7 rounded-full object-cover border border-zinc-200"
+                />
+              ) : (
+                <div className="w-7 h-7 rounded-full bg-blue-600 text-white text-[11px] font-bold flex items-center justify-center shrink-0">
+                  {displayName.charAt(0).toUpperCase()}
+                </div>
+              )}
+              <div className="hidden md:flex items-center gap-1.5 text-xs font-mono font-semibold text-zinc-700 bg-zinc-100 px-2 py-1 rounded-md">
+                <span>{rollNumber}</span>
+              </div>
             </div>
 
             {profile?.is_admin && (
@@ -132,19 +145,32 @@ export default async function DashboardPage() {
         {/* Welcome Banner & Public Profile Card */}
         <div className="bg-white rounded-2xl border border-zinc-200/90 p-6 sm:p-8 shadow-sm space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-zinc-100 pb-6">
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-zinc-950">
-                  Welcome, {displayName}
-                </h1>
-                <Badge variant="success">
-                  <CheckCircle2 className="w-3 h-3" />
-                  Verified
-                </Badge>
+            <div className="flex items-center gap-4">
+              {profile?.avatar_url ? (
+                <img
+                  src={profile.avatar_url}
+                  alt={displayName}
+                  className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl object-cover shrink-0 shadow-sm border border-zinc-200"
+                />
+              ) : (
+                <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white font-bold text-xl sm:text-2xl flex items-center justify-center shrink-0 shadow-sm">
+                  {displayName.charAt(0).toUpperCase()}
+                </div>
+              )}
+              <div className="space-y-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-zinc-950">
+                    Welcome, {displayName}
+                  </h1>
+                  <Badge variant="success">
+                    <CheckCircle2 className="w-3 h-3" />
+                    Verified
+                  </Badge>
+                </div>
+                <p className="text-sm text-zinc-600">
+                  Connected to <strong className="text-zinc-900">{campus}</strong>
+                </p>
               </div>
-              <p className="text-sm text-zinc-600">
-                Connected to <strong className="text-zinc-900">{campus}</strong>
-              </p>
             </div>
 
             <div className="flex items-center gap-3">

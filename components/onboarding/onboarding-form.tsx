@@ -20,6 +20,8 @@ import {
 } from "lucide-react";
 import { Profile } from "@/types/database";
 
+import { AvatarPicker } from "@/components/profile/avatar-picker";
+
 interface OnboardingFormProps {
   initialProfile: Partial<Profile> | null;
   userEmail: string;
@@ -47,6 +49,7 @@ export function OnboardingForm({
   const router = useRouter();
 
   const [fullName, setFullName] = useState(initialProfile?.full_name || "");
+  const [avatarUrl, setAvatarUrl] = useState(initialProfile?.avatar_url || "");
   const [department, setDepartment] = useState(
     initialProfile?.department || DEPARTMENTS[0]
   );
@@ -87,6 +90,7 @@ export function OnboardingForm({
     try {
       const formData = new FormData();
       formData.append("fullName", fullName);
+      formData.append("avatarUrl", avatarUrl);
       formData.append("department", department);
       formData.append("yearOfStudy", yearOfStudy.toString());
       formData.append("upiId", upiId);
@@ -164,11 +168,28 @@ export function OnboardingForm({
         </p>
       </div>
 
+      {/* Profile Picture */}
+      <div className="p-4 rounded-xl bg-white border border-zinc-200/80 space-y-2">
+        <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-700">
+          Profile Photo (Optional)
+        </label>
+        <p className="text-xs text-zinc-500">
+          Upload a clear photo or select a campus student avatar for your profile.
+        </p>
+        <div className="pt-2">
+          <AvatarPicker
+            currentAvatarUrl={avatarUrl}
+            name={fullName || rollNumber}
+            onAvatarChange={(url) => setAvatarUrl(url)}
+          />
+        </div>
+      </div>
+
       {/* Full Name */}
       <Input
         type="text"
         label="Full Name"
-        placeholder="e.g. Govardhan Reddy"
+        placeholder="Enter your full name"
         value={fullName}
         onChange={(e) => {
           setFullName(e.target.value);

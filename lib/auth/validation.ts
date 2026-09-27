@@ -2,7 +2,7 @@ import { CollegeEmailValidation } from "@/types/auth";
 
 /**
  * Validates whether an email belongs to an authorized college domain.
- * Example supported: 24pa1a1210@vishnu.edu.in
+ * Example supported: rollnumber@vishnu.edu.in
  */
 export function validateCollegeEmail(email: string): CollegeEmailValidation {
   const trimmed = email.trim().toLowerCase();
@@ -39,7 +39,7 @@ export function validateCollegeEmail(email: string): CollegeEmailValidation {
     return {
       isValid: false,
       error:
-        "Velto is campus-only. Personal emails like Gmail or Yahoo are not permitted. Please use your official college email (e.g. 24pa1a1210@vishnu.edu.in).",
+        "Velto is campus-only. Personal emails like Gmail or Yahoo are not permitted. Please use your official college email (e.g. example@vishnu.edu.in).",
     };
   }
 
@@ -52,11 +52,11 @@ export function validateCollegeEmail(email: string): CollegeEmailValidation {
     return {
       isValid: false,
       error:
-        "Only college-issued email IDs are accepted (e.g. 24pa1a1210@vishnu.edu.in).",
+        "Only college-issued email IDs are accepted (e.g. example@vishnu.edu.in).",
     };
   }
 
-  // Extract student roll number from username prefix (e.g. 24pa1a1210 -> 24PA1A1210)
+  // Extract student roll number from username prefix (e.g. rollnumber -> ROLLNUMBER)
   const rollNumber = username.toUpperCase();
 
   return {

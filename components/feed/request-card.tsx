@@ -166,7 +166,17 @@ export function RequestCard({
         {!isOwner && requester ? (
           <div className="space-y-1">
             <div className="flex items-center gap-1.5 font-semibold text-zinc-900">
-              <User className="w-3.5 h-3.5 text-blue-600" />
+              {requester.avatar_url ? (
+                <img
+                  src={requester.avatar_url}
+                  alt={requesterName}
+                  className="w-5 h-5 rounded-full object-cover border border-zinc-200"
+                />
+              ) : (
+                <div className="w-5 h-5 rounded-full bg-blue-100 text-blue-700 text-[10px] font-bold flex items-center justify-center shrink-0">
+                  {requesterName.charAt(0).toUpperCase()}
+                </div>
+              )}
               <span>{requesterName}</span>
               <CheckCircle2 className="w-3 h-3 text-emerald-500" />
             </div>

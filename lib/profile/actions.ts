@@ -150,6 +150,7 @@ export async function completeOnboardingAction(formData: FormData): Promise<{
   const department = (formData.get("department") as string)?.trim() ?? "";
   const yearOfStudy = (formData.get("yearOfStudy") as string)?.trim() ?? "";
   const upiId = (formData.get("upiId") as string)?.trim().toLowerCase() ?? "";
+  const avatarUrl = (formData.get("avatarUrl") as string)?.trim() || null;
 
   // 1. Validate fields
   const validation = validateOnboardingData({
@@ -180,6 +181,7 @@ export async function completeOnboardingAction(formData: FormData): Promise<{
       department: department,
       year_of_study: parsedYear,
       upi_id: upiId,
+      avatar_url: avatarUrl,
       is_onboarded: true,
       updated_at: new Date().toISOString(),
     })
@@ -215,6 +217,7 @@ export async function completeOnboardingAction(formData: FormData): Promise<{
         department: department,
         year_of_study: parsedYear,
         upi_id: upiId,
+        avatar_url: avatarUrl,
         is_onboarded: true,
         is_verified: true,
         updated_at: new Date().toISOString(),
@@ -253,9 +256,44 @@ export async function completeOnboardingAction(formData: FormData): Promise<{
   revalidatePath("/dashboard");
   revalidatePath("/onboarding");
   revalidatePath("/feed");
+  revalidatePath("/profile");
 
   return {
     success: true,
     message: "Profile setup completed successfully!",
   };
+}
+
+/**
+ * Server action to update the user's profile picture.
+ */
+export async function updateAvatarAction(
+  avatarUrl: string
+): Promise<{ success: boolean; error?: string }> {
+  const supabase = await createClient();
+  if (!supabase) return { success: false, error: "Database unavailable." };
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return { success: false, error: "Authentication required." };
+
+  const { error } = await supabase
+    .from("profiles")
+    .update({
+      avatar_url: avatarUrl || null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", user.id);
+
+  if (error) {
+    console.error("Error updating avatar:", error);
+    return { success: false, error: error.message };
+  }
+
+  revalidatePath("/profile");
+  revalidatePath("/dashboard");
+  revalidatePath("/feed");
+  return { success: true };
 }

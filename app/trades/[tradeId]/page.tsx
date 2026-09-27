@@ -284,9 +284,17 @@ export default async function TradePage({ params }: TradePageProps) {
             </div>
 
             <div className="flex items-start gap-4">
-              <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white font-black text-lg flex items-center justify-center shrink-0 shadow-md shadow-blue-500/10">
-                {partnerName.charAt(0).toUpperCase()}
-              </div>
+              {partner?.avatar_url ? (
+                <img
+                  src={partner.avatar_url}
+                  alt={partnerName}
+                  className="w-12 h-12 rounded-2xl object-cover shrink-0 shadow-md border border-zinc-200"
+                />
+              ) : (
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white font-black text-lg flex items-center justify-center shrink-0 shadow-md shadow-blue-500/10">
+                  {partnerName.charAt(0).toUpperCase()}
+                </div>
+              )}
 
               <div className="space-y-1">
                 <h4 className="text-base font-bold text-zinc-950">
