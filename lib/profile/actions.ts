@@ -21,7 +21,7 @@ export interface UserRoutingResult {
 
 /**
  * Server-side check for user authentication and onboarding status.
- * Used by protected routes (/dashboard, /onboarding, /requests).
+ * Used by protected routes (/dashboard, /onboarding, /requests, /feed).
  */
 export async function checkUserRouting(): Promise<UserRoutingResult> {
   const supabase = await createClient();
@@ -56,8 +56,12 @@ export async function checkUserRouting(): Promise<UserRoutingResult> {
     .eq("id", user.id)
     .maybeSingle();
 
-  // If profile doesn't exist yet (e.g. trigger didn't run), create base profile
-  if (!profile && !profileError) {
+  if (profileError) {
+    console.error("Error fetching profile in checkUserRouting:", profileError);
+  }
+
+  // If profile doesn't exist yet, attempt to create base profile
+  if (!profile) {
     const rollNumber =
       user.user_metadata?.roll_number || user.email.split("@")[0].toUpperCase();
     const campus = user.user_metadata?.campus || "Vishnu Educational Society";
@@ -79,23 +83,30 @@ export async function checkUserRouting(): Promise<UserRoutingResult> {
       status: "NEEDS_ONBOARDING",
       destination: "/onboarding",
       user: { id: user.id, email: user.email },
-      profile: (newProfile as Profile) || null,
+      profile: (newProfile as Profile) || ({
+        id: user.id,
+        email: user.email,
+        roll_number: rollNumber,
+        campus: campus,
+        is_onboarded: false,
+        is_verified: true,
+      } as unknown as Profile),
     };
   }
 
-  if (profile?.is_banned || profile?.is_suspended) {
+  if (profile.is_banned || profile.is_suspended) {
     return {
       status: "RESTRICTED",
       destination: "/access-restricted",
       user: { id: user.id, email: user.email },
       profile: profile as Profile,
-      message: profile?.is_banned
+      message: profile.is_banned
         ? "Your campus account has been permanently banned."
         : "Your campus account is temporarily suspended.",
     };
   }
 
-  if (!profile?.is_onboarded) {
+  if (!profile.is_onboarded) {
     return {
       status: "NEEDS_ONBOARDING",
       destination: "/onboarding",
@@ -115,6 +126,7 @@ export async function checkUserRouting(): Promise<UserRoutingResult> {
 /**
  * Server Action: Submit profile onboarding information.
  * Enforces server-side validation and protects sensitive fields.
+ * Strictly verifies database update succeeded before returning success.
  */
 export async function completeOnboardingAction(formData: FormData): Promise<{
   success: boolean;
@@ -130,8 +142,8 @@ export async function completeOnboardingAction(formData: FormData): Promise<{
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) {
-    return { success: false, message: "You must be signed in to onboard." };
+  if (!user || !user.email) {
+    return { success: false, message: "You must be signed in to complete onboarding." };
   }
 
   const fullName = (formData.get("fullName") as string)?.trim() ?? "";
@@ -155,37 +167,92 @@ export async function completeOnboardingAction(formData: FormData): Promise<{
     };
   }
 
-  // 2. Update profile with ONLY allowed fields
-  // Prevents tampering with email, roll_number, rating, trade counts, or admin status
-  const { error: updateError } = await supabase
+  const rollNumber =
+    user.user_metadata?.roll_number || user.email.split("@")[0].toUpperCase();
+  const campus = user.user_metadata?.campus || "Vishnu Educational Society";
+  const parsedYear = parseInt(yearOfStudy, 10);
+
+  // 2. First attempt: update existing row and verify using .select()
+  const { data: updatedRows, error: updateError } = await supabase
     .from("profiles")
     .update({
       full_name: fullName,
       department: department,
-      year_of_study: parseInt(yearOfStudy, 10),
+      year_of_study: parsedYear,
       upi_id: upiId,
       is_onboarded: true,
       updated_at: new Date().toISOString(),
     })
-    .eq("id", user.id);
+    .eq("id", user.id)
+    .select();
 
   if (updateError) {
-    // If the database columns haven't been created yet in Supabase
     if (updateError.message.includes("does not exist")) {
       return {
         success: false,
         message:
-          "Database migration required: Please run 'supabase/migrations/01_foundation_schema.sql' in your Supabase SQL Editor.",
+          "Database columns missing in Supabase: Please run the SQL migration script in your Supabase SQL Editor.",
       };
     }
     return {
       success: false,
-      message: `Failed to save profile: ${updateError.message}`,
+      message: `Database error during update: ${updateError.message}`,
+    };
+  }
+
+  let savedProfile = updatedRows && updatedRows.length > 0 ? updatedRows[0] : null;
+
+  // 3. Fallback: If 0 rows were updated, profile row does not exist yet. Insert or upsert it.
+  if (!savedProfile) {
+    const { data: insertedRows, error: insertError } = await supabase
+      .from("profiles")
+      .insert({
+        id: user.id,
+        email: user.email,
+        roll_number: rollNumber,
+        campus: campus,
+        full_name: fullName,
+        department: department,
+        year_of_study: parsedYear,
+        upi_id: upiId,
+        is_onboarded: true,
+        is_verified: true,
+        updated_at: new Date().toISOString(),
+      })
+      .select();
+
+    if (insertError) {
+      if (
+        insertError.code === "42501" ||
+        insertError.message.includes("row-level security")
+      ) {
+        return {
+          success: false,
+          message:
+            "RLS Permission Notice: Profile row does not exist yet and RLS blocked insertion. Please run the provided SQL in Supabase SQL Editor to enable profile creation.",
+        };
+      }
+      return {
+        success: false,
+        message: `Failed to insert profile record: ${insertError.message}`,
+      };
+    }
+
+    savedProfile = insertedRows && insertedRows.length > 0 ? insertedRows[0] : null;
+  }
+
+  // 4. Strict Verification: NEVER report success unless is_onboarded is confirmed true in DB
+  if (!savedProfile || savedProfile.is_onboarded !== true) {
+    return {
+      success: false,
+      message:
+        "Database verification failed: The profile was not saved with is_onboarded = true. Please check your Supabase tables.",
     };
   }
 
   revalidatePath("/dashboard");
   revalidatePath("/onboarding");
+  revalidatePath("/feed");
 
   return {
     success: true,

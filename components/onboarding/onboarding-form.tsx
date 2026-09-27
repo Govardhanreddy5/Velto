@@ -99,7 +99,8 @@ export function OnboardingForm({
         }
         setServerError(result.message);
       } else {
-        router.push("/dashboard");
+        setServerError(null);
+        router.replace("/dashboard");
         router.refresh();
       }
     } catch {

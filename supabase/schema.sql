@@ -195,6 +195,23 @@ CREATE POLICY "profiles_update_own"
     USING (auth.uid() = id)
     WITH CHECK (auth.uid() = id);
 
+CREATE POLICY "profiles_insert_own"
+    ON public.profiles FOR INSERT
+    TO authenticated
+    WITH CHECK (auth.uid() = id);
+
+-- Backfill any existing auth.users into public.profiles
+INSERT INTO public.profiles (id, email, roll_number, campus, is_verified, is_onboarded)
+SELECT 
+    id, 
+    email, 
+    COALESCE(raw_user_meta_data->>'roll_number', UPPER(SPLIT_PART(email, '@', 1))),
+    COALESCE(raw_user_meta_data->>'campus', 'Vishnu Educational Society'),
+    TRUE,
+    FALSE
+FROM auth.users
+ON CONFLICT (id) DO NOTHING;
+
 -- REQUESTS POLICIES
 CREATE POLICY "requests_select_feed_or_own"
     ON public.exchange_requests FOR SELECT
