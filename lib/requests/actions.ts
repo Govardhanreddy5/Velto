@@ -214,7 +214,6 @@ export async function getFeedRequests(): Promise<{
     .eq("status", "OPEN")
     .gt("expires_at", now)
     .eq("campus", campus)
-    .neq("requester_id", user.id)
     .order("created_at", { ascending: false });
 
   if (error) {

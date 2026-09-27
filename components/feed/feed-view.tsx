@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ExchangeRequest, RequestType } from "@/types/database";
 import { RequestCard } from "./request-card";
+import { AcceptModal } from "./accept-modal";
 import { cancelRequestAction } from "@/lib/requests/actions";
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -33,6 +34,7 @@ export function FeedView({
   const [activeTab, setActiveTab] = useState<"feed" | "my">("feed");
   const [filterType, setFilterType] = useState<"ALL" | RequestType>("ALL");
   const [cancellingId, setCancellingId] = useState<string | null>(null);
+  const [acceptTargetRequest, setAcceptTargetRequest] = useState<ExchangeRequest | null>(null);
   const [now, setNow] = useState<number>(0);
 
   // Periodically update time to auto-filter expired requests from view
@@ -72,18 +74,16 @@ export function FeedView({
   // Filter public feed requests:
   // 1. Must be OPEN
   // 2. Must not be expired
-  // 3. Must not be created by current user
   const visibleFeedRequests = useMemo(() => {
     return initialFeedRequests.filter((r) => {
       const isUnexpired = now === 0 ? true : new Date(r.expires_at).getTime() > now;
       const isOpen = r.status === "OPEN";
-      const isNotOwn = r.requester_id !== currentUserId;
       const matchesFilter =
         filterType === "ALL" || r.request_type === filterType;
 
-      return isUnexpired && isOpen && isNotOwn && matchesFilter;
+      return isUnexpired && isOpen && matchesFilter;
     });
-  }, [initialFeedRequests, now, currentUserId, filterType]);
+  }, [initialFeedRequests, now, filterType]);
 
   const visibleMyRequests = useMemo(() => {
     if (filterType === "ALL") return initialMyRequests;
@@ -205,7 +205,14 @@ export function FeedView({
         visibleFeedRequests.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {visibleFeedRequests.map((req) => (
-              <RequestCard key={req.id} request={req} isOwner={false} />
+              <RequestCard
+                key={req.id}
+                request={req}
+                isOwner={req.requester_id === currentUserId}
+                onCancel={handleCancel}
+                onAccept={setAcceptTargetRequest}
+                isCancelling={cancellingId === req.id}
+              />
             ))}
           </div>
         ) : (
@@ -274,6 +281,13 @@ export function FeedView({
           </div>
         )
       )}
+
+      {/* Confirmation & Acceptance Modal */}
+      <AcceptModal
+        request={acceptTargetRequest}
+        isOpen={!!acceptTargetRequest}
+        onClose={() => setAcceptTargetRequest(null)}
+      />
     </div>
   );
 }

@@ -18,6 +18,7 @@ interface RequestCardProps {
   request: ExchangeRequest;
   isOwner?: boolean;
   onCancel?: (id: string) => void;
+  onAccept?: (request: ExchangeRequest) => void;
   isCancelling?: boolean;
 }
 
@@ -25,6 +26,7 @@ export function RequestCard({
   request,
   isOwner = false,
   onCancel,
+  onAccept,
   isCancelling = false,
 }: RequestCardProps) {
   const isNeedCash = request.request_type === "NEED_CASH";
@@ -182,11 +184,23 @@ export function RequestCard({
             </div>
           </div>
         ) : (
-          <div className="text-xs text-zinc-500">
-            <span>Posted by you</span>
-            <span className="ml-2 font-mono font-semibold text-zinc-700">
-              ({request.status})
-            </span>
+          <div className="space-y-1">
+            <div className="flex items-center gap-1.5 font-semibold text-zinc-900">
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 font-semibold text-[11px] border border-blue-200">
+                <User className="w-3 h-3" />
+                Posted by you
+              </span>
+              <span className="text-[11px] font-mono font-medium text-zinc-500">
+                ({request.status})
+              </span>
+            </div>
+            {requester && (
+              <div className="flex items-center gap-2 text-zinc-500 text-[11px]">
+                <span>{requesterName}</span>
+                <span>•</span>
+                <span>{department}</span>
+              </div>
+            )}
           </div>
         )}
 
@@ -206,11 +220,11 @@ export function RequestCard({
           ) : (
             <button
               type="button"
-              disabled
-              title="Trade matching will be available in Milestone 5"
-              className="w-full sm:w-auto px-4 py-2 text-xs font-semibold rounded-lg bg-zinc-100 text-zinc-400 border border-zinc-200 cursor-not-allowed text-center"
+              disabled={isExpired || request.status !== "OPEN"}
+              onClick={() => onAccept && onAccept(request)}
+              className="w-full sm:w-auto px-4 py-2 text-xs font-bold rounded-xl bg-blue-600 hover:bg-blue-700 text-white shadow-sm shadow-blue-500/10 active:scale-95 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed text-center"
             >
-              Accept Request (Matching coming next)
+              Accept Request
             </button>
           )}
         </div>
