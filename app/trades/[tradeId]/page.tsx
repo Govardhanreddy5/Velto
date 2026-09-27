@@ -1,6 +1,7 @@
 import { checkUserRouting } from "@/lib/profile/actions";
 import { getTradeById, getTradeMessages } from "@/lib/trades/actions";
 import { TradeChat } from "@/components/trades/trade-chat";
+import { TradeSettlement } from "@/components/trades/trade-settlement";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import {
@@ -325,6 +326,15 @@ export default async function TradePage({ params }: TradePageProps) {
             </div>
           </div>
         </div>
+
+        {/* Two-Sided Settlement & Confirmation Section */}
+        <section className="space-y-3">
+          <TradeSettlement
+            trade={trade}
+            currentUserId={currentUserId!}
+            partnerName={partnerName}
+          />
+        </section>
 
         {/* Private Realtime In-Trade Chat */}
         <section className="space-y-3">

@@ -312,3 +312,66 @@ export async function sendTradeMessageAction(
     message: formatted,
   };
 }
+
+export interface ConfirmSettlementResult {
+  success: boolean;
+  status?: string;
+  completed?: boolean;
+  requester_confirmed?: boolean;
+  fulfiller_confirmed?: boolean;
+  error?: string;
+  message?: string;
+}
+
+/**
+ * Server action to confirm receipt of cash or UPI in trade settlement.
+ * Invokes the atomic confirm_trade_settlement RPC function.
+ */
+export async function confirmTradeSettlementAction(
+  tradeId: string
+): Promise<ConfirmSettlementResult> {
+  const supabase = await createClient();
+
+  if (!supabase) {
+    return { success: false, error: "Database connection failed." };
+  }
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { success: false, error: "Authentication required." };
+  }
+
+  if (!tradeId || typeof tradeId !== "string") {
+    return { success: false, error: "Invalid trade ID provided." };
+  }
+
+  const { data, error } = await supabase.rpc("confirm_trade_settlement", {
+    p_trade_id: tradeId,
+  });
+
+  if (error) {
+    console.error("Error executing confirm_trade_settlement:", error);
+    return {
+      success: false,
+      error: error.message || "Failed to confirm trade settlement.",
+    };
+  }
+
+  const result = data as ConfirmSettlementResult;
+
+  if (!result?.success) {
+    return {
+      success: false,
+      error: result?.error || "Failed to confirm trade settlement.",
+    };
+  }
+
+  revalidatePath(`/trades/${tradeId}`);
+  revalidatePath("/dashboard");
+  revalidatePath("/feed");
+
+  return result;
+}
