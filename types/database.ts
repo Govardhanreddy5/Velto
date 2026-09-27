@@ -96,4 +96,26 @@ export interface SafetyReport {
   admin_notes: string | null;
   created_at: string;
   updated_at: string;
+  reporter?: Partial<Profile>;
+  reported_user?: Partial<Profile>;
+  trade?: Partial<Trade>;
 }
+
+export type ModerationAction =
+  | "SUSPEND_USER"
+  | "BAN_USER"
+  | "RESTORE_USER"
+  | "UPDATE_REPORT_STATUS";
+
+export interface ModerationAuditLog {
+  id: string;
+  admin_id: string;
+  target_user_id: string;
+  action: ModerationAction;
+  reason: string;
+  report_id: string | null;
+  created_at: string;
+  admin?: Partial<Profile>;
+  target_user?: Partial<Profile>;
+}
+

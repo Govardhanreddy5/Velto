@@ -18,6 +18,7 @@ import {
   Lock,
   Building,
   GraduationCap,
+  Shield,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { Metadata } from "next";
@@ -100,6 +101,15 @@ export default async function ProfilePage() {
           </div>
 
           <div className="flex items-center gap-3">
+            {profile?.is_admin && (
+              <Link
+                href="/admin"
+                className="inline-flex items-center gap-1.5 text-xs py-1.5 px-3 h-8 rounded-lg bg-rose-50 text-rose-700 font-bold border border-rose-200 hover:bg-rose-100 transition-colors shadow-xs"
+              >
+                <Shield className="w-3.5 h-3.5 text-rose-600" />
+                Admin Console
+              </Link>
+            )}
             <form action={signOutAction}>
               <Button
                 variant="outline"
