@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 export default function Home() {
   return (
     <main className="min-h-screen flex flex-col items-center justify-center bg-zinc-950 text-zinc-100 px-6 py-12">
@@ -21,13 +23,19 @@ export default function Home() {
           secure, and campus-friendly peer-to-peer exchanges.
         </p>
 
-        <div className="pt-4 flex justify-center">
-          <button
-            type="button"
-            className="px-6 py-3 rounded-lg bg-emerald-500 text-zinc-950 font-semibold hover:bg-emerald-400 active:scale-95 transition-all shadow-lg shadow-emerald-500/20 cursor-pointer"
+        <div className="pt-4 flex flex-col sm:flex-row items-center justify-center gap-3">
+          <Link
+            href="/auth?mode=signup"
+            className="w-full sm:w-auto px-6 py-3 rounded-lg bg-emerald-500 text-zinc-950 font-semibold hover:bg-emerald-400 active:scale-95 transition-all shadow-lg shadow-emerald-500/20 text-center cursor-pointer"
           >
-            Get Started
-          </button>
+            Get Started (Sign Up)
+          </Link>
+          <Link
+            href="/auth?mode=signin"
+            className="w-full sm:w-auto px-6 py-3 rounded-lg border border-zinc-800 text-zinc-300 hover:bg-zinc-900 active:scale-95 transition-all text-center cursor-pointer"
+          >
+            Student Sign In
+          </Link>
         </div>
       </div>
     </main>
