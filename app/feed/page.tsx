@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { FeedView } from "@/components/feed/feed-view";
 import { Button } from "@/components/ui/button";
-import { LogOut, PlusCircle, LayoutDashboard } from "lucide-react";
+import { LogOut, PlusCircle, LayoutDashboard, User } from "lucide-react";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -62,6 +62,13 @@ export default async function FeedPage() {
                 className="text-blue-600 flex items-center gap-1.5 font-bold"
               >
                 Campus Feed
+              </Link>
+              <Link
+                href="/profile"
+                className="text-zinc-600 hover:text-zinc-950 flex items-center gap-1.5 transition-colors"
+              >
+                <User className="w-3.5 h-3.5" />
+                Profile
               </Link>
             </nav>
           </div>

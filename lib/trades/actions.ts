@@ -2,7 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
-import { Trade, TradeMessage } from "@/types/database";
+import { Trade, TradeMessage, TradeRating } from "@/types/database";
 
 export interface AcceptRequestResult {
   success: boolean;
@@ -374,4 +374,193 @@ export async function confirmTradeSettlementAction(
   revalidatePath("/feed");
 
   return result;
+}
+
+export interface SubmitRatingResult {
+  success: boolean;
+  ratingId?: string;
+  error?: string;
+  message?: string;
+}
+
+/**
+ * Server action to rate a trade partner after a trade is COMPLETED.
+ * Invokes the secure submit_trade_rating RPC.
+ */
+export async function submitTradeRatingAction(
+  tradeId: string,
+  rating: number,
+  comment?: string
+): Promise<SubmitRatingResult> {
+  const supabase = await createClient();
+
+  if (!supabase) {
+    return { success: false, error: "Database connection failed." };
+  }
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { success: false, error: "Authentication required." };
+  }
+
+  if (!tradeId) {
+    return { success: false, error: "Invalid trade ID." };
+  }
+
+  if (!rating || rating < 1 || rating > 5) {
+    return { success: false, error: "Please select a rating between 1 and 5 stars." };
+  }
+
+  const { data, error } = await supabase.rpc("submit_trade_rating", {
+    p_trade_id: tradeId,
+    p_rating: rating,
+    p_comment: comment?.trim() || null,
+  });
+
+  if (error) {
+    console.error("Error submitting rating:", error);
+    return {
+      success: false,
+      error: error.message || "Failed to submit rating.",
+    };
+  }
+
+  const result = data as SubmitRatingResult;
+
+  if (!result?.success) {
+    return {
+      success: false,
+      error: result?.error || "Failed to submit rating.",
+    };
+  }
+
+  revalidatePath(`/trades/${tradeId}`);
+  revalidatePath("/dashboard");
+  revalidatePath("/profile");
+
+  return result;
+}
+
+/**
+ * Retrieves the rating submitted by the current user for a specific trade.
+ */
+export async function getTradeRatingForUser(
+  tradeId: string
+): Promise<TradeRating | null> {
+  const supabase = await createClient();
+  if (!supabase) return null;
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return null;
+
+  const { data, error } = await supabase
+    .from("trade_ratings")
+    .select("*")
+    .eq("trade_id", tradeId)
+    .eq("reviewer_id", user.id)
+    .maybeSingle();
+
+  if (error || !data) return null;
+  return data as TradeRating;
+}
+
+export interface TradeHistoryItem {
+  id: string;
+  request_id: string;
+  amount: number;
+  request_type: string;
+  status: string;
+  meetup_location: string;
+  completed_at: string;
+  isRequester: boolean;
+  partner: {
+    id: string;
+    full_name: string | null;
+    department: string | null;
+    year_of_study: number | null;
+    roll_number: string;
+    rating_avg: number;
+    total_trades: number;
+  } | null;
+  hasRated: boolean;
+  myRating?: number;
+}
+
+/**
+ * Server action to retrieve completed trade history for the signed-in user.
+ */
+export async function getUserTradeHistory(): Promise<TradeHistoryItem[]> {
+  const supabase = await createClient();
+  if (!supabase) return [];
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return [];
+
+  const { data: trades, error } = await supabase
+    .from("trades")
+    .select(`
+      id,
+      request_id,
+      requester_id,
+      fulfiller_id,
+      amount,
+      request_type,
+      status,
+      meetup_location,
+      completed_at,
+      requester:profiles!trades_requester_id_fkey(
+        id, full_name, department, year_of_study, roll_number, rating_avg, total_trades
+      ),
+      fulfiller:profiles!trades_fulfiller_id_fkey(
+        id, full_name, department, year_of_study, roll_number, rating_avg, total_trades
+      )
+    `)
+    .eq("status", "COMPLETED")
+    .or(`requester_id.eq.${user.id},fulfiller_id.eq.${user.id}`)
+    .order("completed_at", { ascending: false });
+
+  if (error || !trades) {
+    console.error("Error fetching trade history:", error);
+    return [];
+  }
+
+  // Fetch ratings submitted by user
+  const tradeIds = trades.map((t) => t.id);
+  const { data: ratings } = await supabase
+    .from("trade_ratings")
+    .select("trade_id, rating")
+    .eq("reviewer_id", user.id)
+    .in("trade_id", tradeIds.length > 0 ? tradeIds : ["00000000-0000-0000-0000-000000000000"]);
+
+  const ratingsMap = new Map((ratings || []).map((r) => [r.trade_id, r.rating]));
+
+  return trades.map((t) => {
+    const isRequester = t.requester_id === user.id;
+    const partnerData = isRequester ? t.fulfiller : t.requester;
+    const partner = Array.isArray(partnerData) ? partnerData[0] : partnerData;
+    const myRating = ratingsMap.get(t.id);
+
+    return {
+      id: t.id,
+      request_id: t.request_id,
+      amount: Number(t.amount),
+      request_type: t.request_type,
+      status: t.status,
+      meetup_location: t.meetup_location,
+      completed_at: t.completed_at || "",
+      isRequester,
+      partner: partner || null,
+      hasRated: ratingsMap.has(t.id),
+      myRating,
+    };
+  });
 }

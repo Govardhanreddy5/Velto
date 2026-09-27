@@ -81,6 +81,12 @@ export default async function DashboardPage() {
               >
                 Campus Feed
               </Link>
+              <Link
+                href="/profile"
+                className="text-zinc-600 hover:text-zinc-950 transition-colors"
+              >
+                Profile & History
+              </Link>
             </nav>
           </div>
 

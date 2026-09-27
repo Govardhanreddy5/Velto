@@ -1,7 +1,8 @@
 import { checkUserRouting } from "@/lib/profile/actions";
-import { getTradeById, getTradeMessages } from "@/lib/trades/actions";
+import { getTradeById, getTradeMessages, getTradeRatingForUser } from "@/lib/trades/actions";
 import { TradeChat } from "@/components/trades/trade-chat";
 import { TradeSettlement } from "@/components/trades/trade-settlement";
+import { TradeRatingCard } from "@/components/trades/trade-rating-card";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import {
@@ -46,9 +47,10 @@ export default async function TradePage({ params }: TradePageProps) {
     redirect("/onboarding");
   }
 
-  const [{ trade, error }, { messages }] = await Promise.all([
+  const [{ trade, error }, { messages }, userRating] = await Promise.all([
     getTradeById(tradeId),
     getTradeMessages(tradeId),
+    getTradeRatingForUser(tradeId),
   ]);
 
   // If trade not found or user is not a participant
@@ -335,6 +337,17 @@ export default async function TradePage({ params }: TradePageProps) {
             partnerName={partnerName}
           />
         </section>
+
+        {/* Milestone 8: Partner Rating Card (Only when trade is COMPLETED) */}
+        {trade.status === "COMPLETED" && (
+          <section className="space-y-3">
+            <TradeRatingCard
+              tradeId={trade.id}
+              partnerName={partnerName}
+              initialRating={userRating}
+            />
+          </section>
+        )}
 
         {/* Private Realtime In-Trade Chat */}
         <section className="space-y-3">
