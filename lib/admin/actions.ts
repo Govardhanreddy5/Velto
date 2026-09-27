@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import {
+  ExchangeRequest,
   ModerationAction,
   ModerationAuditLog,
   ModerationStatus,
@@ -336,3 +337,246 @@ export async function getModerationAuditLogs(): Promise<ModerationAuditLog[]> {
 
   return (data || []) as unknown as ModerationAuditLog[];
 }
+
+/**
+ * Retrieves all registered campus student profiles.
+ */
+export async function getAllStudentsAdmin(): Promise<Profile[]> {
+  const adminCheck = await verifyAdminAccess();
+  if (!adminCheck.isAdmin) return [];
+
+  const supabase = await createClient();
+  if (!supabase) return [];
+
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("*")
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    console.error("Error fetching students:", error);
+    return [];
+  }
+
+  return (data || []) as Profile[];
+}
+
+/**
+ * Retrieves all campus exchange requests across all states (OPEN, ACCEPTED, COMPLETED, CANCELLED).
+ */
+export async function getAllRequestsAdmin(): Promise<ExchangeRequest[]> {
+  const adminCheck = await verifyAdminAccess();
+  if (!adminCheck.isAdmin) return [];
+
+  const supabase = await createClient();
+  if (!supabase) return [];
+
+  const { data, error } = await supabase
+    .from("exchange_requests")
+    .select(`
+      *,
+      requester:profiles!exchange_requests_requester_id_fkey(
+        id, full_name, email, roll_number, department, year_of_study, rating_avg, is_suspended, is_banned
+      )
+    `)
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    console.error("Error fetching admin requests:", error);
+    return [];
+  }
+
+  const formatted: ExchangeRequest[] = (data || []).map((item) => {
+    const row = item as unknown as ExchangeRequest & { requester?: unknown };
+    return {
+      ...row,
+      requester: Array.isArray(row.requester)
+        ? (row.requester[0] as ExchangeRequest["requester"])
+        : (row.requester as ExchangeRequest["requester"]),
+    };
+  });
+
+  return formatted;
+}
+
+/**
+ * Admin action to force-cancel an abusive, invalid, or scam exchange request.
+ */
+export async function cancelRequestAdminAction(
+  requestId: string,
+  reason: string
+): Promise<{ success: boolean; error?: string; message?: string }> {
+  const adminCheck = await verifyAdminAccess();
+  if (!adminCheck.isAdmin) {
+    return { success: false, error: "Unauthorized: Admin privileges required." };
+  }
+
+  if (!reason || !reason.trim()) {
+    return { success: false, error: "A cancellation reason is required." };
+  }
+
+  const supabase = await createClient();
+  if (!supabase) {
+    return { success: false, error: "Database connection failed." };
+  }
+
+  const { data, error } = await supabase.rpc("admin_cancel_request", {
+    p_request_id: requestId,
+    p_reason: reason.trim(),
+  });
+
+  if (error) {
+    console.error("Error cancelling request by admin:", error);
+    return { success: false, error: error.message };
+  }
+
+  revalidatePath("/admin");
+  revalidatePath("/feed");
+  return data as { success: boolean; error?: string; message?: string };
+}
+
+/**
+ * Retrieves all trades across campus for administrative oversight.
+ */
+export async function getAllTradesAdmin(): Promise<Trade[]> {
+  const adminCheck = await verifyAdminAccess();
+  if (!adminCheck.isAdmin) return [];
+
+  const supabase = await createClient();
+  if (!supabase) return [];
+
+  const { data, error } = await supabase
+    .from("trades")
+    .select(`
+      *,
+      requester:profiles!trades_requester_id_fkey(
+        id, full_name, email, roll_number, rating_avg
+      ),
+      fulfiller:profiles!trades_fulfiller_id_fkey(
+        id, full_name, email, roll_number, rating_avg
+      )
+    `)
+    .order("started_at", { ascending: false });
+
+  if (error) {
+    console.error("Error fetching admin trades:", error);
+    return [];
+  }
+
+  const formatted: Trade[] = (data || []).map((item) => {
+    const row = item as unknown as Trade & { requester?: unknown; fulfiller?: unknown };
+    return {
+      ...row,
+      requester: Array.isArray(row.requester)
+        ? (row.requester[0] as Trade["requester"])
+        : (row.requester as Trade["requester"]),
+      fulfiller: Array.isArray(row.fulfiller)
+        ? (row.fulfiller[0] as Trade["fulfiller"])
+        : (row.fulfiller as Trade["fulfiller"]),
+    };
+  });
+
+  return formatted;
+}
+
+/**
+ * Admin action to force-resolve or cancel a trade (e.g. disputed or stuck meetup).
+ */
+export async function resolveTradeAdminAction(
+  tradeId: string,
+  action: "CANCEL" | "COMPLETE",
+  notes: string
+): Promise<{ success: boolean; error?: string; message?: string }> {
+  const adminCheck = await verifyAdminAccess();
+  if (!adminCheck.isAdmin) {
+    return { success: false, error: "Unauthorized: Admin privileges required." };
+  }
+
+  const supabase = await createClient();
+  if (!supabase) {
+    return { success: false, error: "Database connection failed." };
+  }
+
+  const { data, error } = await supabase.rpc("admin_resolve_trade", {
+    p_trade_id: tradeId,
+    p_action: action,
+    p_notes: notes.trim() || "Administrative resolution",
+  });
+
+  if (error) {
+    console.error("Error resolving trade by admin:", error);
+    return { success: false, error: error.message };
+  }
+
+  revalidatePath("/admin");
+  revalidatePath(`/trades/${tradeId}`);
+  return data as { success: boolean; error?: string; message?: string };
+}
+
+/**
+ * Platform overview metrics for the administrator.
+ */
+export async function getPlatformOverviewStats(): Promise<{
+  totalStudents: number;
+  activeRequests: number;
+  activeTrades: number;
+  completedTrades: number;
+  pendingReports: number;
+}> {
+  const adminCheck = await verifyAdminAccess();
+  if (!adminCheck.isAdmin) {
+    return {
+      totalStudents: 0,
+      activeRequests: 0,
+      activeTrades: 0,
+      completedTrades: 0,
+      pendingReports: 0,
+    };
+  }
+
+  const supabase = await createClient();
+  if (!supabase) {
+    return {
+      totalStudents: 0,
+      activeRequests: 0,
+      activeTrades: 0,
+      completedTrades: 0,
+      pendingReports: 0,
+    };
+  }
+
+  const [
+    studentsRes,
+    activeReqRes,
+    activeTradesRes,
+    completedTradesRes,
+    reportsRes,
+  ] = await Promise.all([
+    supabase.from("profiles").select("id", { count: "exact", head: true }),
+    supabase
+      .from("exchange_requests")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "OPEN"),
+    supabase
+      .from("trades")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "IN_PROGRESS"),
+    supabase
+      .from("trades")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "COMPLETED"),
+    supabase
+      .from("safety_reports")
+      .select("id", { count: "exact", head: true })
+      .in("status", ["PENDING", "INVESTIGATING"]),
+  ]);
+
+  return {
+    totalStudents: studentsRes.count || 0,
+    activeRequests: activeReqRes.count || 0,
+    activeTrades: activeTradesRes.count || 0,
+    completedTrades: completedTradesRes.count || 0,
+    pendingReports: reportsRes.count || 0,
+  };
+}
+

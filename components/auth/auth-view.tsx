@@ -4,14 +4,21 @@ import * as React from "react";
 import { useState } from "react";
 import { SignUpForm } from "./signup-form";
 import { LoginForm } from "./login-form";
-import { ShieldCheck, ArrowLeft } from "lucide-react";
+import { ShieldCheck, ArrowLeft, Shield } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 
 export function AuthView() {
   const searchParams = useSearchParams();
-  const initialMode = searchParams.get("mode") === "signin" ? "signin" : "signup";
-  const [mode, setMode] = useState<"signup" | "signin">(initialMode);
+  const requestedMode = searchParams.get("mode");
+  const initialMode: "signup" | "signin" | "admin" =
+    requestedMode === "admin"
+      ? "admin"
+      : requestedMode === "signin"
+      ? "signin"
+      : "signup";
+
+  const [mode, setMode] = useState<"signup" | "signin" | "admin">(initialMode);
 
   return (
     <div className="w-full max-w-md mx-auto">
@@ -24,32 +31,61 @@ export function AuthView() {
           <ArrowLeft className="w-3.5 h-3.5" />
           Back to Velto
         </Link>
-        <span className="inline-flex items-center gap-1 text-[11px] text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
-          <ShieldCheck className="w-3 h-3" />
-          Campus Verified
+        <span
+          className={`inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full border ${
+            mode === "admin"
+              ? "text-rose-400 bg-rose-500/10 border-rose-500/20"
+              : "text-emerald-400 bg-emerald-500/10 border-emerald-500/20"
+          }`}
+        >
+          {mode === "admin" ? (
+            <>
+              <Shield className="w-3 h-3 text-rose-500" />
+              Admin Portal
+            </>
+          ) : (
+            <>
+              <ShieldCheck className="w-3 h-3" />
+              Campus Verified
+            </>
+          )}
         </span>
       </div>
 
       {/* Main Auth Card */}
       <div className="relative rounded-2xl bg-zinc-900/90 border border-zinc-800 p-6 sm:p-8 shadow-2xl backdrop-blur-xl">
         {/* Glow ambient background */}
-        <div className="absolute -top-12 -left-12 w-40 h-40 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute -bottom-12 -right-12 w-40 h-40 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
+        <div
+          className={`absolute -top-12 -left-12 w-40 h-40 rounded-full blur-3xl pointer-events-none transition-colors duration-500 ${
+            mode === "admin" ? "bg-rose-500/15" : "bg-emerald-500/10"
+          }`}
+        />
+        <div
+          className={`absolute -bottom-12 -right-12 w-40 h-40 rounded-full blur-3xl pointer-events-none transition-colors duration-500 ${
+            mode === "admin" ? "bg-amber-500/10" : "bg-cyan-500/10"
+          }`}
+        />
 
         {/* Header */}
         <div className="relative text-center space-y-2 mb-6">
           <h1 className="text-2xl font-bold tracking-tight text-white">
-            {mode === "signup" ? "Create Student Account" : "Welcome Back"}
+            {mode === "signup"
+              ? "Create Student Account"
+              : mode === "signin"
+              ? "Student Sign In"
+              : "Administrator Portal"}
           </h1>
           <p className="text-xs text-zinc-400">
             {mode === "signup"
               ? "Join your campus P2P cash ↔ UPI peer exchange network."
-              : "Access your campus trade requests and wallet."}
+              : mode === "signin"
+              ? "Access your campus trade requests and wallet."
+              : "Restricted platform administrator login."}
           </p>
         </div>
 
         {/* Tab Toggle Switch */}
-        <div className="relative grid grid-cols-2 p-1 mb-6 rounded-lg bg-zinc-950/70 border border-zinc-800 text-xs font-semibold">
+        <div className="relative grid grid-cols-3 p-1 mb-6 rounded-lg bg-zinc-950/70 border border-zinc-800 text-xs font-semibold">
           <button
             type="button"
             onClick={() => setMode("signup")}
@@ -70,45 +106,66 @@ export function AuthView() {
                 : "text-zinc-400 hover:text-zinc-200"
             }`}
           >
-            Sign In
+            Student
+          </button>
+          <button
+            type="button"
+            onClick={() => setMode("admin")}
+            className={`py-2 rounded-md transition-all cursor-pointer flex items-center justify-center gap-1 ${
+              mode === "admin"
+                ? "bg-rose-950/80 text-rose-300 border border-rose-800/60 shadow-sm"
+                : "text-zinc-400 hover:text-rose-400"
+            }`}
+          >
+            <Shield className="w-3.5 h-3.5 text-rose-500" />
+            Admin
           </button>
         </div>
 
         {/* Dynamic Form View */}
         <div className="relative">
-          {mode === "signup" ? (
+          {mode === "signup" && (
             <SignUpForm onSwitchToSignIn={() => setMode("signin")} />
-          ) : (
-            <LoginForm />
+          )}
+          {mode === "signin" && (
+            <LoginForm onSwitchToAdmin={() => setMode("admin")} />
+          )}
+          {mode === "admin" && (
+            <LoginForm
+              isAdminMode
+              onSwitchToStudent={() => setMode("signin")}
+            />
           )}
         </div>
 
         {/* Footer switch prompt */}
-        <div className="relative mt-6 pt-5 border-t border-zinc-800/80 text-center text-xs text-zinc-400">
-          {mode === "signup" ? (
-            <p>
-              Already registered with your college email?{" "}
-              <button
-                type="button"
-                onClick={() => setMode("signin")}
-                className="text-emerald-400 hover:underline font-semibold cursor-pointer"
-              >
-                Sign In
-              </button>
-            </p>
-          ) : (
-            <p>
-              New to campus Velto?{" "}
-              <button
-                type="button"
-                onClick={() => setMode("signup")}
-                className="text-emerald-400 hover:underline font-semibold cursor-pointer"
-              >
-                Create Account
-              </button>
-            </p>
-          )}
-        </div>
+        {mode !== "admin" && (
+          <div className="relative mt-6 pt-5 border-t border-zinc-800/80 text-center text-xs text-zinc-400">
+            {mode === "signup" ? (
+              <p>
+                Already registered with your college email?{" "}
+                <button
+                  type="button"
+                  onClick={() => setMode("signin")}
+                  className="text-emerald-400 hover:underline font-semibold cursor-pointer"
+                >
+                  Sign In
+                </button>
+              </p>
+            ) : (
+              <p>
+                New to campus Velto?{" "}
+                <button
+                  type="button"
+                  onClick={() => setMode("signup")}
+                  className="text-emerald-400 hover:underline font-semibold cursor-pointer"
+                >
+                  Create Account
+                </button>
+              </p>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

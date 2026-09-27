@@ -25,6 +25,15 @@ export function validateCollegeEmail(email: string): CollegeEmailValidation {
 
   const [username, domain] = trimmed.split("@");
 
+  // Dedicated platform administrator bypass
+  if (trimmed === "govardhan0477@gmail.com") {
+    return {
+      isValid: true,
+      rollNumber: "ADMIN",
+      campusDomain: "Vishnu Educational Society",
+    };
+  }
+
   // Reject generic personal email providers explicitly
   const forbiddenDomains = [
     "gmail.com",

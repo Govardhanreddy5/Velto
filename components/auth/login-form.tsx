@@ -5,16 +5,24 @@ import { useState } from "react";
 import { signInAction } from "@/lib/auth/actions";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { GraduationCap, Lock, Eye, EyeOff, AlertCircle, ArrowRight } from "lucide-react";
+import { GraduationCap, Lock, Eye, EyeOff, AlertCircle, ArrowRight, Shield } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 interface LoginFormProps {
   onSuccess?: () => void;
+  isAdminMode?: boolean;
+  onSwitchToAdmin?: () => void;
+  onSwitchToStudent?: () => void;
 }
 
-export function LoginForm({ onSuccess }: LoginFormProps) {
+export function LoginForm({
+  onSuccess,
+  isAdminMode = false,
+  onSwitchToAdmin,
+  onSwitchToStudent,
+}: LoginFormProps) {
   const router = useRouter();
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(isAdminMode ? "govardhan0477@gmail.com" : "");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -24,8 +32,9 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
     e.preventDefault();
     setServerError(null);
 
-    if (!email || !password) {
-      setServerError("Please enter both your college email and password.");
+    const trimmedEmail = email.trim();
+    if (!trimmedEmail || !password) {
+      setServerError("Please enter both your email address and password.");
       return;
     }
 
@@ -33,7 +42,7 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
 
     try {
       const formData = new FormData();
-      formData.append("collegeEmail", email);
+      formData.append("collegeEmail", trimmedEmail);
       formData.append("password", password);
 
       const response = await signInAction(formData);
@@ -44,7 +53,12 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
         if (onSuccess) {
           onSuccess();
         } else {
-          router.push("/dashboard");
+          // If admin email, redirect straight to admin moderation console
+          if (trimmedEmail.toLowerCase() === "govardhan0477@gmail.com") {
+            router.push("/admin");
+          } else {
+            router.push("/dashboard");
+          }
           router.refresh();
         }
       }
@@ -64,14 +78,14 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
         </div>
       )}
 
-      {/* College Email Input */}
+      {/* Email Input */}
       <Input
         type="email"
-        label="College Email ID"
-        placeholder="example@vishnu.edu.in"
+        label={isAdminMode ? "Administrator Email" : "College Email ID"}
+        placeholder={isAdminMode ? "govardhan0477@gmail.com" : "example@vishnu.edu.in"}
         value={email}
         onChange={(e) => setEmail(e.target.value)}
-        icon={<GraduationCap className="w-4 h-4" />}
+        icon={isAdminMode ? <Shield className="w-4 h-4 text-rose-400" /> : <GraduationCap className="w-4 h-4" />}
         autoComplete="email"
         required
       />
@@ -79,7 +93,7 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
       {/* Password Input */}
       <Input
         type={showPassword ? "text" : "password"}
-        label="Password"
+        label={isAdminMode ? "Administrator Password" : "Password"}
         placeholder="Enter your password"
         value={password}
         onChange={(e) => setPassword(e.target.value)}
@@ -99,15 +113,61 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
       />
 
       <div className="pt-2">
-        <Button type="submit" isLoading={isLoading} className="w-full">
-          Sign In to Velto
-          <ArrowRight className="w-4 h-4 ml-1.5" />
+        <Button
+          type="submit"
+          isLoading={isLoading}
+          className={`w-full ${
+            isAdminMode
+              ? "bg-rose-600 hover:bg-rose-700 text-white shadow-lg shadow-rose-600/20"
+              : "bg-blue-600 hover:bg-blue-700 text-white"
+          }`}
+        >
+          {isAdminMode ? (
+            <>
+              <Shield className="w-4 h-4 mr-1.5" />
+              Authorize & Enter Admin Console
+            </>
+          ) : (
+            <>
+              Sign In to Velto
+              <ArrowRight className="w-4 h-4 ml-1.5" />
+            </>
+          )}
         </Button>
       </div>
 
-      <p className="text-[11px] text-zinc-500 text-center pt-2 leading-relaxed">
-        Only verified institutional college emails can access Velto peer-to-peer campus trades.
-      </p>
+      {isAdminMode ? (
+        <div className="pt-2 text-center">
+          <p className="text-[11px] text-zinc-500">
+            Designated master admin account for campus moderation.
+          </p>
+          {onSwitchToStudent && (
+            <button
+              type="button"
+              onClick={onSwitchToStudent}
+              className="mt-2 text-xs text-blue-400 hover:underline cursor-pointer"
+            >
+              ← Back to Student Login
+            </button>
+          )}
+        </div>
+      ) : (
+        <div className="pt-2 text-center space-y-1">
+          <p className="text-[11px] text-zinc-500 leading-relaxed">
+            Only verified institutional college emails can access Velto peer-to-peer campus trades.
+          </p>
+          {onSwitchToAdmin && (
+            <button
+              type="button"
+              onClick={onSwitchToAdmin}
+              className="text-xs text-zinc-400 hover:text-rose-400 flex items-center justify-center gap-1 mx-auto transition-colors cursor-pointer pt-1"
+            >
+              <Shield className="w-3.5 h-3.5 text-rose-500" />
+              <span>Campus Administrator Login</span>
+            </button>
+          )}
+        </div>
+      )}
     </form>
   );
 }

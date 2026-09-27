@@ -1,4 +1,12 @@
-import { verifyAdminAccess, getAdminReports, getModerationAuditLogs } from "@/lib/admin/actions";
+import {
+  verifyAdminAccess,
+  getAdminReports,
+  getModerationAuditLogs,
+  getAllStudentsAdmin,
+  getAllRequestsAdmin,
+  getAllTradesAdmin,
+  getPlatformOverviewStats,
+} from "@/lib/admin/actions";
 import { AdminDashboard } from "@/components/admin/admin-dashboard";
 import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
@@ -15,7 +23,7 @@ export default async function AdminPage() {
 
   // If unauthenticated, redirect to sign-in
   if (!adminCheck.user) {
-    redirect("/auth?mode=signin");
+    redirect("/auth?mode=admin");
   }
 
   // If user is authenticated but not an admin, conceal existence with notFound (404)
@@ -23,9 +31,13 @@ export default async function AdminPage() {
     notFound();
   }
 
-  const [reports, auditLogs] = await Promise.all([
+  const [reports, auditLogs, students, requests, trades, stats] = await Promise.all([
     getAdminReports(),
     getModerationAuditLogs(),
+    getAllStudentsAdmin(),
+    getAllRequestsAdmin(),
+    getAllTradesAdmin(),
+    getPlatformOverviewStats(),
   ]);
 
   return (
@@ -70,6 +82,10 @@ export default async function AdminPage() {
         <AdminDashboard
           initialReports={reports}
           initialAuditLogs={auditLogs}
+          initialStudents={students}
+          initialRequests={requests}
+          initialTrades={trades}
+          initialStats={stats}
           adminEmail={adminCheck.user.email}
         />
       </main>
