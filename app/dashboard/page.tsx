@@ -103,6 +103,16 @@ export default async function DashboardPage() {
               <span>{rollNumber}</span>
             </div>
 
+            {profile?.is_admin && (
+              <Link
+                href="/admin"
+                className="inline-flex items-center gap-1.5 text-xs py-1.5 px-3 h-8 rounded-lg bg-rose-50 text-rose-700 font-bold border border-rose-200 hover:bg-rose-100 transition-colors shadow-xs"
+              >
+                <ShieldCheck className="w-3.5 h-3.5 text-rose-600" />
+                Admin
+              </Link>
+            )}
+
             <form action={signOutAction}>
               <Button
                 variant="outline"

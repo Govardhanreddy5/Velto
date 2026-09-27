@@ -49,7 +49,10 @@ export async function signUpAction(formData: FormData): Promise<AuthResponse> {
   }
 
   const headerList = await headers();
-  const origin = headerList.get("origin") || "http://localhost:3000";
+  const origin =
+    headerList.get("origin") ||
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    "http://localhost:3000";
 
   // 4. Register with Supabase Auth
   const { data, error } = await supabase.auth.signUp({
