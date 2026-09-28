@@ -12,6 +12,7 @@ import {
   CheckCircle2,
   FileText,
   User,
+  Building2,
 } from "lucide-react";
 
 interface RequestCardProps {
@@ -147,9 +148,24 @@ export function RequestCard({
 
       {/* Middle Details: Location & Note */}
       <div className="space-y-2 text-xs text-zinc-600">
-        <div className="flex items-center gap-1.5 font-medium text-zinc-800">
-          <MapPin className="w-4 h-4 text-blue-600 shrink-0" />
-          <span>Meetup at: <strong className="text-zinc-950">{request.location_hint}</strong></span>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-1.5 font-medium text-zinc-800">
+            <MapPin className="w-4 h-4 text-blue-600 shrink-0" />
+            <span>Meetup at: <strong className="text-zinc-950">{request.location_hint}</strong></span>
+          </div>
+
+          <span
+            className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full border ${
+              (requester?.campus || request.campus || "").includes("SVECW")
+                ? "bg-purple-50 text-purple-700 border-purple-200"
+                : "bg-blue-50 text-blue-700 border-blue-200"
+            }`}
+          >
+            <Building2 className="w-3 h-3" />
+            {(requester?.campus || request.campus || "").includes("SVECW")
+              ? "SVECW"
+              : "Vishnu"}
+          </span>
         </div>
 
         {request.note && (

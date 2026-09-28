@@ -119,6 +119,18 @@ export async function checkUserRouting(): Promise<UserRoutingResult> {
     };
   }
 
+  // Safe sync for existing users: if full_name is present in profile but not in auth metadata, update it
+  if (profile.full_name && user.user_metadata?.full_name !== profile.full_name) {
+    try {
+      await supabase.auth.updateUser({
+        data: { full_name: profile.full_name },
+      });
+    } catch (err) {
+      // Non-blocking
+      console.error("Non-blocking error syncing auth user metadata for existing user:", err);
+    }
+  }
+
   return {
     status: "READY",
     destination: "/dashboard",
@@ -258,6 +270,16 @@ export async function completeOnboardingAction(formData: FormData): Promise<{
       message:
         "Database verification failed: The profile was not saved with is_onboarded = true. Please check your Supabase tables.",
     };
+  }
+
+  // 5. Sync full_name into Supabase Auth user metadata so Display name is visible in Supabase Auth
+  try {
+    await supabase.auth.updateUser({
+      data: { full_name: fullName },
+    });
+  } catch (authMetaErr) {
+    // Non-blocking: public.profiles remains the authoritative application profile record
+    console.error("Non-blocking error syncing full_name to auth user metadata:", authMetaErr);
   }
 
   revalidatePath("/dashboard");

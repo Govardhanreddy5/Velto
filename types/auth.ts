@@ -7,6 +7,8 @@ export interface AuthResponse {
     userId?: string;
     rollNumber?: string;
     requiresEmailVerification?: boolean;
+    needsEmailConfirmation?: boolean;
+    isExistingUser?: boolean;
   };
 }
 

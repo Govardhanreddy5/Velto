@@ -1,8 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { useState } from "react";
-import { signUpAction } from "@/lib/auth/actions";
+import { useState, useEffect } from "react";
+import { signUpAction, resendConfirmationEmailAction } from "@/lib/auth/actions";
 import { validateCollegeEmail } from "@/lib/auth/validation";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,7 @@ import {
   MailCheck,
   Building2,
   ArrowRight,
+  RefreshCw,
 } from "lucide-react";
 import { AuthResponse } from "@/types/auth";
 
@@ -35,15 +36,71 @@ export function SignUpForm({ onSuccess, onSwitchToSignIn }: SignUpFormProps) {
   const [clientErrors, setClientErrors] = useState<Record<string, string>>({});
   const [successResult, setSuccessResult] = useState<AuthResponse | null>(null);
 
+  // Resend state & cooldown
+  const [isResending, setIsResending] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
+  const [resendStatus, setResendStatus] = useState<{
+    type: "success" | "error";
+    message: string;
+  } | null>(null);
+  const [showUnconfirmedResendBanner, setShowUnconfirmedResendBanner] = useState(false);
+
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const timer = setInterval(() => {
+      setResendCooldown((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [resendCooldown]);
+
   // Live validation detection for college email
   const emailValidation = React.useMemo(() => {
     if (!email) return null;
     return validateCollegeEmail(email);
   }, [email]);
 
+  const handleResendConfirmation = async (targetEmail?: string) => {
+    const emailToUse = (targetEmail || email).trim();
+    if (!emailToUse) {
+      setResendStatus({
+        type: "error",
+        message: "Please enter your college email address first.",
+      });
+      return;
+    }
+
+    setIsResending(true);
+    setResendStatus(null);
+
+    try {
+      const res = await resendConfirmationEmailAction(emailToUse);
+      if (res.success) {
+        setResendStatus({
+          type: "success",
+          message: res.message,
+        });
+        setResendCooldown(60); // 60 seconds cooldown
+      } else {
+        setResendStatus({
+          type: "error",
+          message: res.message,
+        });
+      }
+    } catch {
+      setResendStatus({
+        type: "error",
+        message: "Failed to dispatch confirmation email. Please check your network.",
+      });
+    } finally {
+      setIsResending(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setServerError(null);
+    setShowUnconfirmedResendBanner(false);
+    setResendStatus(null);
     const errors: Record<string, string> = {};
 
     // Validate email
@@ -81,6 +138,9 @@ export function SignUpForm({ onSuccess, onSwitchToSignIn }: SignUpFormProps) {
 
       if (!response.success) {
         setServerError(response.message);
+        if (response.data?.needsEmailConfirmation) {
+          setShowUnconfirmedResendBanner(true);
+        }
       } else {
         setSuccessResult(response);
         if (onSuccess) {
@@ -121,19 +181,53 @@ export function SignUpForm({ onSuccess, onSwitchToSignIn }: SignUpFormProps) {
             <span>Status:</span>
             <span className="text-amber-400 font-medium">Pending Verification</span>
           </div>
+          <div className="flex items-center justify-between text-zinc-400 pt-1 border-t border-zinc-800 text-[11px]">
+            <span>Tip:</span>
+            <span className="text-zinc-400">Check Spam/Junk folder if not in primary inbox.</span>
+          </div>
         </div>
 
+        {/* Resend status feedback */}
+        {resendStatus && (
+          <div
+            className={`p-3 rounded-lg text-xs flex items-start gap-2 text-left ${
+              resendStatus.type === "success"
+                ? "bg-emerald-500/10 border border-emerald-500/20 text-emerald-400"
+                : "bg-rose-500/10 border border-rose-500/20 text-rose-400"
+            }`}
+          >
+            {resendStatus.type === "success" ? (
+              <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />
+            ) : (
+              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+            )}
+            <span>{resendStatus.message}</span>
+          </div>
+        )}
+
         <div className="space-y-3 pt-2">
-          <p className="text-xs text-zinc-500">
-            Click the link in the email to activate your Velto peer profile.
-          </p>
           <Button
             type="button"
             variant="outline"
-            className="w-full"
+            disabled={isResending || resendCooldown > 0}
+            onClick={() => handleResendConfirmation(email)}
+            className="w-full text-xs flex items-center justify-center gap-1.5"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${isResending ? "animate-spin" : ""}`} />
+            {resendCooldown > 0
+              ? `Resend available in ${resendCooldown}s`
+              : isResending
+              ? "Dispatching Email..."
+              : "Resend Confirmation Email"}
+          </Button>
+
+          <Button
+            type="button"
+            variant="ghost"
+            className="w-full text-zinc-400 hover:text-white text-xs"
             onClick={onSwitchToSignIn}
           >
-            Go to Sign In
+            Already confirmed? Go to Sign In
           </Button>
         </div>
       </div>
@@ -146,6 +240,49 @@ export function SignUpForm({ onSuccess, onSwitchToSignIn }: SignUpFormProps) {
         <div className="p-3 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs flex items-start gap-2 text-left">
           <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
           <span>{serverError}</span>
+        </div>
+      )}
+
+      {/* Unconfirmed user quick resend helper */}
+      {showUnconfirmedResendBanner && (
+        <div className="p-3.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs space-y-2 text-left">
+          <p className="font-semibold text-amber-200">
+            Account already exists but awaiting verification?
+          </p>
+          <p className="text-[11px] text-amber-300/80">
+            Click below to receive a fresh verification link in your college mailbox.
+          </p>
+          <Button
+            type="button"
+            size="sm"
+            disabled={isResending || resendCooldown > 0}
+            onClick={() => handleResendConfirmation(email)}
+            className="w-full bg-amber-600 hover:bg-amber-700 text-white font-semibold text-xs"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${isResending ? "animate-spin" : ""}`} />
+            {resendCooldown > 0
+              ? `Resend cooldown: ${resendCooldown}s`
+              : isResending
+              ? "Dispatching..."
+              : `Resend Link to ${email}`}
+          </Button>
+        </div>
+      )}
+
+      {resendStatus && (
+        <div
+          className={`p-3 rounded-lg text-xs flex items-start gap-2 text-left ${
+            resendStatus.type === "success"
+              ? "bg-emerald-500/10 border border-emerald-500/20 text-emerald-400"
+              : "bg-rose-500/10 border border-rose-500/20 text-rose-400"
+          }`}
+        >
+          {resendStatus.type === "success" ? (
+            <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />
+          ) : (
+            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+          )}
+          <span>{resendStatus.message}</span>
         </div>
       )}
 
@@ -239,7 +376,7 @@ export function SignUpForm({ onSuccess, onSwitchToSignIn }: SignUpFormProps) {
       </div>
 
       <p className="text-[11px] text-zinc-500 text-center pt-2 leading-relaxed">
-        By creating an account, you verify that you are a currently enrolled student at Vishnu Educational Society (@vishnu.edu.in) or SVECW (@svecw.edu.in).
+        By creating an account, you verify that you are an enrolled student at Vishnu Educational Society (@vishnu.edu.in) or SVECW (@svecw.edu.in).
       </p>
     </form>
   );

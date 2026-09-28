@@ -116,8 +116,8 @@ export function FeedView({
             </span>
           </div>
           <p className="text-xs text-zinc-500">
-            Active peer-to-peer cash ↔ UPI requests inside{" "}
-            <strong className="text-zinc-800">{campus}</strong>
+            Active peer-to-peer cash ↔ UPI requests across{" "}
+            <strong className="text-zinc-800">Vishnu & SVECW Community</strong>
           </p>
         </div>
 

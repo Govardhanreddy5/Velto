@@ -5,6 +5,13 @@ export const ALLOWED_CAMPUS_DOMAINS: Record<string, string> = {
   "svecw.edu.in": "Shri Vishnu Engineering College for Women (SVECW)",
 };
 
+export const APPROVED_CAMPUS_NAMES = Object.values(ALLOWED_CAMPUS_DOMAINS);
+
+export function isApprovedCampus(campus: string | null | undefined): boolean {
+  if (!campus) return false;
+  return APPROVED_CAMPUS_NAMES.includes(campus);
+}
+
 /**
  * Returns canonical campus name for an email, or null if domain is unapproved.
  */

@@ -317,8 +317,20 @@ export default async function ProfilePage() {
                           </span>
                         </div>
 
-                        <div className="text-xs text-zinc-600 flex items-center gap-1.5">
+                        <div className="text-xs text-zinc-600 flex flex-wrap items-center gap-1.5">
                           <span>Partner: <strong>{partnerName}</strong></span>
+                          {item.partner?.campus && (
+                            <span
+                              className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
+                                item.partner.campus.includes("SVECW")
+                                  ? "bg-purple-50 text-purple-700 border-purple-200"
+                                  : "bg-blue-50 text-blue-700 border-blue-200"
+                              }`}
+                            >
+                              <Building className="w-2.5 h-2.5" />
+                              {item.partner.campus.includes("SVECW") ? "SVECW" : "Vishnu"}
+                            </span>
+                          )}
                           <span>•</span>
                           <span className="flex items-center gap-1 text-zinc-500">
                             <MapPin className="w-3 h-3 text-blue-600" />
@@ -455,8 +467,20 @@ export default async function ProfilePage() {
                           </span>
                         </div>
 
-                        <div className="text-xs text-zinc-600 flex items-center gap-1.5">
+                        <div className="text-xs text-zinc-600 flex flex-wrap items-center gap-1.5">
                           <span>Partner: <strong>{partnerName}</strong></span>
+                          {item.partner?.campus && (
+                            <span
+                              className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
+                                item.partner.campus.includes("SVECW")
+                                  ? "bg-purple-50 text-purple-700 border-purple-200"
+                                  : "bg-blue-50 text-blue-700 border-blue-200"
+                              }`}
+                            >
+                              <Building className="w-2.5 h-2.5" />
+                              {item.partner.campus.includes("SVECW") ? "SVECW" : "Vishnu"}
+                            </span>
+                          )}
                           <span>•</span>
                           <span className="flex items-center gap-1 text-zinc-500">
                             <MapPin className="w-3 h-3 text-blue-600" />

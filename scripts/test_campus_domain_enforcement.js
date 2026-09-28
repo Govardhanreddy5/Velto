@@ -146,10 +146,20 @@ function acceptExchangeRequest(request, fulfillerProfile) {
   if (request.status !== 'OPEN') {
     return { success: false, error: 'Request is no longer available.' };
   }
-  if (request.campus !== fulfillerProfile.campus) {
+  const approvedCampuses = [
+    'Vishnu Educational Society',
+    'Shri Vishnu Engineering College for Women (SVECW)',
+  ];
+  if (!approvedCampuses.includes(request.campus) || !approvedCampuses.includes(fulfillerProfile.campus)) {
     return {
       success: false,
-      error: 'Exchange requests can only be accepted by students from the same campus.',
+      error: 'Exchange requests can only be accepted by students from approved college campuses.',
+    };
+  }
+  if (request.requester_id === fulfillerProfile.id) {
+    return {
+      success: false,
+      error: 'You cannot accept your own exchange request.',
     };
   }
   return {
@@ -302,8 +312,8 @@ async function runAllTests() {
     );
   });
 
-  // 14. Feed isolation works in both directions
-  test('Feed isolation: SVECW requests appear only in SVECW feed, Vishnu in Vishnu feed', () => {
+  // 14. Shared Feed: Both Vishnu and SVECW requests appear in the shared feed
+  test('Shared feed: Both Vishnu and SVECW requests appear in the shared campus feed', () => {
     const requests = [
       { id: 'req-1', campus: 'Vishnu Educational Society', amount: 100 },
       { id: 'req-2', campus: 'Vishnu Educational Society', amount: 200 },
@@ -311,22 +321,20 @@ async function runAllTests() {
       { id: 'req-4', campus: 'Shri Vishnu Engineering College for Women (SVECW)', amount: 300 },
     ];
 
-    const vishnuStudentCampus = 'Vishnu Educational Society';
-    const svecwStudentCampus = 'Shri Vishnu Engineering College for Women (SVECW)';
+    const approvedCampuses = [
+      'Vishnu Educational Society',
+      'Shri Vishnu Engineering College for Women (SVECW)',
+    ];
 
-    // Vishnu feed query
-    const vishnuFeed = requests.filter((r) => r.campus === vishnuStudentCampus);
-    assert.strictEqual(vishnuFeed.length, 2);
-    assert(vishnuFeed.every((r) => r.campus === 'Vishnu Educational Society'));
-
-    // SVECW feed query
-    const svecwFeed = requests.filter((r) => r.campus === svecwStudentCampus);
-    assert.strictEqual(svecwFeed.length, 2);
-    assert(svecwFeed.every((r) => r.campus === 'Shri Vishnu Engineering College for Women (SVECW)'));
+    // Shared feed includes all approved college requests
+    const sharedFeed = requests.filter((r) => approvedCampuses.includes(r.campus));
+    assert.strictEqual(sharedFeed.length, 4);
+    assert(sharedFeed.some((r) => r.campus === 'Vishnu Educational Society'));
+    assert(sharedFeed.some((r) => r.campus === 'Shri Vishnu Engineering College for Women (SVECW)'));
   });
 
-  // 15. Cross-campus acceptance is rejected
-  test('Cross-campus atomic acceptance is strictly rejected', () => {
+  // 15. Cross-college acceptance succeeds; unapproved campus and self-acceptance rejected
+  test('Cross-college acceptance succeeds between Vishnu and SVECW', () => {
     const vishnuRequest = {
       id: 'req-vishnu-99',
       requester_id: 'user-vishnu-1',
@@ -339,21 +347,26 @@ async function runAllTests() {
       campus: 'Shri Vishnu Engineering College for Women (SVECW)',
     };
 
+    // SVECW accepts Vishnu request -> SUCCEEDS
     const crossCampusResult = acceptExchangeRequest(vishnuRequest, svecwFulfiller);
-    assert.strictEqual(crossCampusResult.success, false);
-    assert.strictEqual(
-      crossCampusResult.error,
-      'Exchange requests can only be accepted by students from the same campus.'
-    );
+    assert.strictEqual(crossCampusResult.success, true);
+    assert.strictEqual(crossCampusResult.trade_id, 'trade-uuid-123');
 
-    // Same campus acceptance succeeds
-    const vishnuFulfiller = {
-      id: 'user-vishnu-3',
+    // Self-acceptance is rejected
+    const selfAcceptResult = acceptExchangeRequest(vishnuRequest, {
+      id: 'user-vishnu-1',
       campus: 'Vishnu Educational Society',
+    });
+    assert.strictEqual(selfAcceptResult.success, false);
+    assert.strictEqual(selfAcceptResult.error, 'You cannot accept your own exchange request.');
+
+    // Unapproved campus fulfiller is rejected
+    const unapprovedFulfiller = {
+      id: 'user-outsider-9',
+      campus: 'Unapproved University',
     };
-    const sameCampusResult = acceptExchangeRequest(vishnuRequest, vishnuFulfiller);
-    assert.strictEqual(sameCampusResult.success, true);
-    assert.strictEqual(sameCampusResult.trade_id, 'trade-uuid-123');
+    const unapprovedResult = acceptExchangeRequest(vishnuRequest, unapprovedFulfiller);
+    assert.strictEqual(unapprovedResult.success, false);
   });
 
   console.log('\n-----------------------------------------------------------');

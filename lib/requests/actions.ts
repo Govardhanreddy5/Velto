@@ -2,7 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { validateCreateRequestData } from "@/lib/requests/validation";
-import { getCampusForEmail } from "@/lib/auth/validation";
+import { getCampusForEmail, isApprovedCampus } from "@/lib/auth/validation";
 import { ExchangeRequest } from "@/types/database";
 import { revalidatePath } from "next/cache";
 
@@ -91,7 +91,14 @@ export async function createRequestAction(
   const userCampus =
     profile.campus ||
     getCampusForEmail(user.email || "") ||
-    "Vishnu Educational Society";
+    "";
+
+  if (!isApprovedCampus(userCampus)) {
+    return {
+      success: false,
+      message: "Requests can only be created by verified students from @vishnu.edu.in or @svecw.edu.in.",
+    };
+  }
 
   const { data: newRequest, error: insertError } = await supabase
     .from("exchange_requests")
@@ -194,7 +201,7 @@ export async function getFeedRequests(): Promise<{
     "Vishnu Educational Society";
   const now = new Date().toISOString();
 
-  // Query open, unexpired requests from the same campus, excluding current user
+  // Query open, unexpired requests from the shared two-college marketplace
   const { data, error } = await supabase
     .from("exchange_requests")
     .select(`
@@ -218,12 +225,12 @@ export async function getFeedRequests(): Promise<{
         roll_number,
         rating_avg,
         total_ratings,
-        total_trades
+        total_trades,
+        campus
       )
     `)
     .eq("status", "OPEN")
     .gt("expires_at", now)
-    .eq("campus", campus)
     .order("created_at", { ascending: false });
 
   if (error) {

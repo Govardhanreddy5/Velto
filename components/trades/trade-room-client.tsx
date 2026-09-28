@@ -18,6 +18,7 @@ import {
   ShieldCheck,
   ArrowLeft,
   Lock,
+  Building2,
 } from "lucide-react";
 
 interface TradeRoomClientProps {
@@ -264,8 +265,21 @@ export function TradeRoomClient({
                 <h4 className="text-base font-bold text-zinc-950">
                   {partnerName}
                 </h4>
-                <div className="text-xs text-zinc-500">
-                  <span>{partnerDept}</span> • <span>{partnerYear}</span>
+                <div className="text-xs text-zinc-500 flex flex-wrap items-center gap-1.5 pt-0.5">
+                  <span
+                    className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
+                      (partner?.campus || "").includes("SVECW")
+                        ? "bg-purple-50 text-purple-700 border-purple-200"
+                        : "bg-blue-50 text-blue-700 border-blue-200"
+                    }`}
+                  >
+                    <Building2 className="w-3 h-3" />
+                    {(partner?.campus || "").includes("SVECW") ? "SVECW" : "Vishnu"}
+                  </span>
+                  <span>•</span>
+                  <span>{partnerDept}</span>
+                  <span>•</span>
+                  <span>{partnerYear}</span>
                 </div>
                 <div className="flex items-center gap-2 pt-1 text-xs">
                   <span className="flex items-center gap-1 font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">

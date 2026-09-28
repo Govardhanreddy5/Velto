@@ -132,7 +132,8 @@ export async function getTradeById(tradeId: string): Promise<TradeDetailsResult>
         roll_number,
         rating_avg,
         total_ratings,
-        total_trades
+        total_trades,
+        campus
       ),
       fulfiller:profiles!trades_fulfiller_id_fkey(
         id,
@@ -143,7 +144,8 @@ export async function getTradeById(tradeId: string): Promise<TradeDetailsResult>
         roll_number,
         rating_avg,
         total_ratings,
-        total_trades
+        total_trades,
+        campus
       )
     `)
     .eq("id", tradeId)
@@ -490,6 +492,7 @@ export interface TradeHistoryItem {
     roll_number: string;
     rating_avg: number;
     total_trades: number;
+    campus?: string;
   } | null;
   hasRated: boolean;
   myRating?: number;
@@ -521,10 +524,10 @@ export async function getUserTradeHistory(): Promise<TradeHistoryItem[]> {
       meetup_location,
       completed_at,
       requester:profiles!trades_requester_id_fkey(
-        id, full_name, department, year_of_study, roll_number, rating_avg, total_trades
+        id, full_name, department, year_of_study, roll_number, rating_avg, total_trades, campus
       ),
       fulfiller:profiles!trades_fulfiller_id_fkey(
-        id, full_name, department, year_of_study, roll_number, rating_avg, total_trades
+        id, full_name, department, year_of_study, roll_number, rating_avg, total_trades, campus
       )
     `)
     .eq("status", "COMPLETED")
@@ -591,6 +594,7 @@ export interface ActiveTradeItem {
     rating_avg: number;
     total_trades: number;
     avatar_url?: string | null;
+    campus?: string;
   } | null;
 }
 
@@ -623,10 +627,10 @@ export async function getActiveUserTrades(): Promise<ActiveTradeItem[]> {
       fulfiller_confirmed,
       started_at,
       requester:profiles!trades_requester_id_fkey(
-        id, full_name, department, year_of_study, roll_number, rating_avg, total_trades, avatar_url
+        id, full_name, department, year_of_study, roll_number, rating_avg, total_trades, avatar_url, campus
       ),
       fulfiller:profiles!trades_fulfiller_id_fkey(
-        id, full_name, department, year_of_study, roll_number, rating_avg, total_trades, avatar_url
+        id, full_name, department, year_of_study, roll_number, rating_avg, total_trades, avatar_url, campus
       )
     `)
     .eq("status", "IN_PROGRESS")
