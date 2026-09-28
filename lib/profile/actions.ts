@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { validateOnboardingData } from "@/lib/profile/validation";
+import { getCampusForEmail } from "@/lib/auth/validation";
 import { Profile } from "@/types/database";
 import { revalidatePath } from "next/cache";
 
@@ -64,7 +65,10 @@ export async function checkUserRouting(): Promise<UserRoutingResult> {
   if (!profile) {
     const rollNumber =
       user.user_metadata?.roll_number || user.email.split("@")[0].toUpperCase();
-    const campus = user.user_metadata?.campus || "Vishnu Educational Society";
+    const campus =
+      getCampusForEmail(user.email) ||
+      user.user_metadata?.campus ||
+      "Vishnu Educational Society";
 
     const { data: newProfile } = await supabase
       .from("profiles")
@@ -170,7 +174,10 @@ export async function completeOnboardingAction(formData: FormData): Promise<{
 
   const rollNumber =
     user.user_metadata?.roll_number || user.email.split("@")[0].toUpperCase();
-  const campus = user.user_metadata?.campus || "Vishnu Educational Society";
+  const campus =
+    getCampusForEmail(user.email) ||
+    user.user_metadata?.campus ||
+    "Vishnu Educational Society";
   const parsedYear = parseInt(yearOfStudy, 10);
 
   // 2. First attempt: update existing row and verify using .select()

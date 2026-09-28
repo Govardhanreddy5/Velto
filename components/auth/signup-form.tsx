@@ -154,7 +154,7 @@ export function SignUpForm({ onSuccess, onSwitchToSignIn }: SignUpFormProps) {
         <Input
           type="email"
           label="College Email ID"
-          placeholder="example@vishnu.edu.in"
+          placeholder="example@vishnu.edu.in or @svecw.edu.in"
           value={email}
           onChange={(e) => {
             setEmail(e.target.value);
@@ -239,7 +239,7 @@ export function SignUpForm({ onSuccess, onSwitchToSignIn }: SignUpFormProps) {
       </div>
 
       <p className="text-[11px] text-zinc-500 text-center pt-2 leading-relaxed">
-        By creating an account, you verify that you are a currently enrolled student with access to your institutional college email.
+        By creating an account, you verify that you are a currently enrolled student at Vishnu Educational Society (@vishnu.edu.in) or SVECW (@svecw.edu.in).
       </p>
     </form>
   );

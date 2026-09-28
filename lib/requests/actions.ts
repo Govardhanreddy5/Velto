@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { validateCreateRequestData } from "@/lib/requests/validation";
+import { getCampusForEmail } from "@/lib/auth/validation";
 import { ExchangeRequest } from "@/types/database";
 import { revalidatePath } from "next/cache";
 
@@ -86,7 +87,12 @@ export async function createRequestAction(
   const expiresAt = new Date(Date.now() + minutes * 60 * 1000).toISOString();
   const numericAmount = Math.round(parseFloat(amount) * 100) / 100;
 
-  // 5. Insert into exchange_requests
+  // 5. Insert into exchange_requests with verified student campus
+  const userCampus =
+    profile.campus ||
+    getCampusForEmail(user.email || "") ||
+    "Vishnu Educational Society";
+
   const { data: newRequest, error: insertError } = await supabase
     .from("exchange_requests")
     .insert({
@@ -96,7 +102,7 @@ export async function createRequestAction(
       location_hint: location,
       note: note || null,
       status: "OPEN",
-      campus: profile.campus || "Vishnu Educational Society",
+      campus: userCampus,
       expires_at: expiresAt,
     })
     .select("id")
@@ -182,7 +188,10 @@ export async function getFeedRequests(): Promise<{
     .eq("id", user.id)
     .single();
 
-  const campus = profile?.campus || "Vishnu Educational Society";
+  const campus =
+    profile?.campus ||
+    getCampusForEmail(user.email || "") ||
+    "Vishnu Educational Society";
   const now = new Date().toISOString();
 
   // Query open, unexpired requests from the same campus, excluding current user

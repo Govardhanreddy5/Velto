@@ -5,6 +5,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { completeOnboardingAction } from "@/lib/profile/actions";
 import { validateOnboardingData } from "@/lib/profile/validation";
+import { getCampusForEmail } from "@/lib/auth/validation";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -65,7 +66,10 @@ export function OnboardingForm({
   const rollNumber =
     initialProfile?.roll_number ||
     userEmail.split("@")[0].toUpperCase();
-  const campus = initialProfile?.campus || "Vishnu Educational Society";
+  const campus =
+    initialProfile?.campus ||
+    getCampusForEmail(userEmail) ||
+    "Vishnu Educational Society";
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();

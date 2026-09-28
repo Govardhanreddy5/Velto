@@ -263,7 +263,8 @@ export default function Home() {
               </h3>
               <p className="text-xs text-zinc-600 leading-relaxed pl-6">
                 Only verified students with an active institutional college email
-                (e.g., @vishnu.edu.in) can join. Outsiders cannot create accounts
+                from Vishnu Educational Society (@vishnu.edu.in) or Shri Vishnu Engineering
+                College for Women (@svecw.edu.in) can join. Outsiders cannot create accounts
                 or view trade requests.
               </p>
             </div>

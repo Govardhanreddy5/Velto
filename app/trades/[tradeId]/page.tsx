@@ -80,6 +80,7 @@ export default async function TradePage({ params }: TradePageProps) {
       currentUserId={routing.user!.id}
       userRating={userRating}
       userReports={userReports}
+      campus={routing.profile?.campus}
     />
   );
 }

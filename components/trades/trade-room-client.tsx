@@ -26,6 +26,7 @@ interface TradeRoomClientProps {
   currentUserId: string;
   userRating: TradeRating | null;
   userReports: SafetyReport[];
+  campus?: string;
 }
 
 export function TradeRoomClient({
@@ -34,12 +35,14 @@ export function TradeRoomClient({
   currentUserId,
   userRating,
   userReports,
+  campus,
 }: TradeRoomClientProps) {
   const [trade, setTrade] = useState<Trade>(initialTrade);
 
   const isRequester = trade.requester_id === currentUserId;
   const partner = isRequester ? trade.fulfiller : trade.requester;
   const isNeedCash = trade.request_type === "NEED_CASH";
+  const campusName = campus || trade.requester?.campus || partner?.campus || "Vishnu Educational Society";
 
   const partnerName = partner?.full_name || "Verified Student";
   const partnerDept = partner?.department || "Campus Student";
@@ -304,7 +307,7 @@ export function TradeRoomClient({
                     {trade.meetup_location}
                   </div>
                   <div className="text-[11px] text-zinc-500">
-                    Campus: Vishnu Educational Society
+                    Campus: {campusName}
                   </div>
                 </div>
               </div>

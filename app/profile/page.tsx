@@ -1,6 +1,7 @@
 import { checkUserRouting } from "@/lib/profile/actions";
 import { getUserTradeHistory, getActiveUserTrades } from "@/lib/trades/actions";
 import { signOutAction } from "@/lib/auth/actions";
+import { getCampusForEmail } from "@/lib/auth/validation";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import {
@@ -59,7 +60,10 @@ export default async function ProfilePage() {
   const yearText = profile?.year_of_study
     ? `Year ${profile.year_of_study}`
     : "Enrolled";
-  const campus = profile?.campus || "Vishnu Educational Society";
+  const campus =
+    profile?.campus ||
+    (user?.email ? getCampusForEmail(user.email) : null) ||
+    "Vishnu Educational Society";
   const ratingAvg = Number(profile?.rating_avg || 5.0).toFixed(1);
   const totalTrades = profile?.total_trades || 0;
   const totalRatings = profile?.total_ratings || 0;

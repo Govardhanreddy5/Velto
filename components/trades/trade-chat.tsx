@@ -126,6 +126,7 @@ export function TradeChat({
       channel = supabase
         .channel(`trade_chat_${tradeId}`)
         .on(
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           "postgres_changes" as any,
           {
             event: "INSERT",
@@ -133,6 +134,7 @@ export function TradeChat({
             table: "trade_messages",
             filter: `trade_id=eq.${tradeId}`,
           },
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           (payload: { new: Record<string, any> }) => {
             const newMsg = payload.new as TradeMessage;
 

@@ -1,8 +1,27 @@
 import { CollegeEmailValidation } from "@/types/auth";
 
+export const ALLOWED_CAMPUS_DOMAINS: Record<string, string> = {
+  "vishnu.edu.in": "Vishnu Educational Society",
+  "svecw.edu.in": "Shri Vishnu Engineering College for Women (SVECW)",
+};
+
+/**
+ * Returns canonical campus name for an email, or null if domain is unapproved.
+ */
+export function getCampusForEmail(email: string): string | null {
+  if (!email) return null;
+  const trimmed = email.trim().toLowerCase();
+  const domain = trimmed.split("@")[1];
+  return (domain && ALLOWED_CAMPUS_DOMAINS[domain]) || null;
+}
+
 /**
  * Validates whether an email belongs to an authorized college domain.
- * Example supported: rollnumber@vishnu.edu.in
+ * Exactly supported:
+ *  - @vishnu.edu.in (Vishnu Educational Society)
+ *  - @svecw.edu.in (Shri Vishnu Engineering College for Women (SVECW))
+ *
+ * Rejects subdomains, personal emails, generic .edu/.ac.in, and all other domains.
  */
 export function validateCollegeEmail(email: string): CollegeEmailValidation {
   const trimmed = email.trim().toLowerCase();
@@ -23,18 +42,17 @@ export function validateCollegeEmail(email: string): CollegeEmailValidation {
     };
   }
 
-  const [username, domain] = trimmed.split("@");
-
-  // Dedicated platform administrator bypass
-  if (trimmed === "govardhan0477@gmail.com") {
+  const parts = trimmed.split("@");
+  if (parts.length !== 2) {
     return {
-      isValid: true,
-      rollNumber: "ADMIN",
-      campusDomain: "Vishnu Educational Society",
+      isValid: false,
+      error: "Please enter a valid email address.",
     };
   }
 
-  // Reject generic personal email providers explicitly
+  const [username, domain] = parts;
+
+  // Reject generic personal email providers explicitly with helpful guidance
   const forbiddenDomains = [
     "gmail.com",
     "yahoo.com",
@@ -48,30 +66,27 @@ export function validateCollegeEmail(email: string): CollegeEmailValidation {
     return {
       isValid: false,
       error:
-        "Velto is campus-only. Personal emails like Gmail or Yahoo are not permitted. Please use your official college email (e.g. example@vishnu.edu.in).",
+        "Velto is campus-only. Personal emails like Gmail or Yahoo are not permitted. Please use your official college email (@vishnu.edu.in or @svecw.edu.in).",
     };
   }
 
-  // Check educational domain: vishnu.edu.in, .edu.in, .ac.in, or .edu
-  const isVishnuCampus = domain === "vishnu.edu.in" || domain.endsWith(".vishnu.edu.in");
-  const isEducationalDomain =
-    domain.endsWith(".edu.in") || domain.endsWith(".ac.in") || domain.endsWith(".edu");
-
-  if (!isVishnuCampus && !isEducationalDomain) {
+  // Check exact canonical college domain (no subdomains, no random .edu.in or .ac.in)
+  const canonicalCampus = ALLOWED_CAMPUS_DOMAINS[domain];
+  if (!canonicalCampus) {
     return {
       isValid: false,
       error:
-        "Only college-issued email IDs are accepted (e.g. example@vishnu.edu.in).",
+        "Only authorized college email IDs (@vishnu.edu.in or @svecw.edu.in) are accepted.",
     };
   }
 
-  // Extract student roll number from username prefix (e.g. rollnumber -> ROLLNUMBER)
+  // Extract student roll number from username prefix (e.g. 24pa1a1205 -> 24PA1A1205)
   const rollNumber = username.toUpperCase();
 
   return {
     isValid: true,
     rollNumber,
-    campusDomain: isVishnuCampus ? "Vishnu Educational Society" : domain,
+    campusDomain: canonicalCampus,
   };
 }
 

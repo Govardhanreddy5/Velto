@@ -1,4 +1,5 @@
 import { checkUserRouting } from "@/lib/profile/actions";
+import { getCampusForEmail } from "@/lib/auth/validation";
 import { redirect } from "next/navigation";
 import { CreateRequestForm } from "@/components/requests/create-request-form";
 import Link from "next/link";
@@ -38,7 +39,10 @@ export default async function CreateRequestPage({
       ? "HAVE_CASH_WANT_UPI"
       : "NEED_CASH";
 
-  const campus = routing.profile?.campus || "Vishnu Educational Society";
+  const campus =
+    routing.profile?.campus ||
+    (routing.user?.email ? getCampusForEmail(routing.user.email) : null) ||
+    "Vishnu Educational Society";
 
   return (
     <main className="min-h-screen bg-zinc-50 text-zinc-900 px-4 py-8 sm:py-12 flex flex-col items-center">

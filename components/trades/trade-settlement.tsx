@@ -39,15 +39,17 @@ export function TradeSettlement({
   const router = useRouter();
 
   const [trade, setTrade] = useState<Trade>(initialTrade);
+  const [prevInitialTrade, setPrevInitialTrade] = useState<Trade>(initialTrade);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [hasCheckedNotice, setHasCheckedNotice] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   // Keep local state in sync if initial prop changes
-  useEffect(() => {
+  if (initialTrade !== prevInitialTrade) {
+    setPrevInitialTrade(initialTrade);
     setTrade(initialTrade);
-  }, [initialTrade]);
+  }
 
   const isRequester = currentUserId === trade.requester_id;
   const isNeedCash = trade.request_type === "NEED_CASH";
@@ -125,6 +127,7 @@ export function TradeSettlement({
       channel = supabase
         .channel(`trade_settlement_${trade.id}`)
         .on(
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           "postgres_changes" as any,
           {
             event: "UPDATE",
@@ -132,6 +135,7 @@ export function TradeSettlement({
             table: "trades",
             filter: `id=eq.${trade.id}`,
           },
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           (payload: { new: Record<string, any> }) => {
             const updated = payload.new as Partial<Trade>;
             setTrade((prev) => {

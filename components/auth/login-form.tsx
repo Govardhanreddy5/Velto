@@ -22,7 +22,7 @@ export function LoginForm({
   onSwitchToStudent,
 }: LoginFormProps) {
   const router = useRouter();
-  const [email, setEmail] = useState(isAdminMode ? "govardhan0477@gmail.com" : "");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -53,8 +53,7 @@ export function LoginForm({
         if (onSuccess) {
           onSuccess();
         } else {
-          // If admin email, redirect straight to admin moderation console
-          if (trimmedEmail.toLowerCase() === "govardhan0477@gmail.com") {
+          if (isAdminMode) {
             router.push("/admin");
           } else {
             router.push("/dashboard");
@@ -81,8 +80,8 @@ export function LoginForm({
       {/* Email Input */}
       <Input
         type="email"
-        label={isAdminMode ? "Administrator Email" : "College Email ID"}
-        placeholder={isAdminMode ? "govardhan0477@gmail.com" : "example@vishnu.edu.in"}
+        label={isAdminMode ? "Campus Administrator Email" : "College Email ID"}
+        placeholder={isAdminMode ? "admin@vishnu.edu.in or admin@svecw.edu.in" : "example@vishnu.edu.in or @svecw.edu.in"}
         value={email}
         onChange={(e) => setEmail(e.target.value)}
         icon={isAdminMode ? <Shield className="w-4 h-4 text-rose-400" /> : <GraduationCap className="w-4 h-4" />}
@@ -139,7 +138,7 @@ export function LoginForm({
       {isAdminMode ? (
         <div className="pt-2 text-center">
           <p className="text-[11px] text-zinc-500">
-            Designated master admin account for campus moderation.
+            Designated campus administrator account for moderation.
           </p>
           {onSwitchToStudent && (
             <button
@@ -154,7 +153,7 @@ export function LoginForm({
       ) : (
         <div className="pt-2 text-center space-y-1">
           <p className="text-[11px] text-zinc-500 leading-relaxed">
-            Only verified institutional college emails can access Velto peer-to-peer campus trades.
+            Only verified college emails (@vishnu.edu.in or @svecw.edu.in) can access Velto peer-to-peer campus trades.
           </p>
           {onSwitchToAdmin && (
             <button
