@@ -1,5 +1,5 @@
 import { checkUserRouting } from "@/lib/profile/actions";
-import { getUserTradeHistory } from "@/lib/trades/actions";
+import { getUserTradeHistory, getActiveUserTrades } from "@/lib/trades/actions";
 import { signOutAction } from "@/lib/auth/actions";
 import { redirect } from "next/navigation";
 import Link from "next/link";
@@ -47,8 +47,9 @@ export default async function ProfilePage() {
   const profile = routing.profile;
   const user = routing.user;
 
-  const [tradeHistory] = await Promise.all([
+  const [tradeHistory, activeTrades] = await Promise.all([
     getUserTradeHistory(),
+    getActiveUserTrades(),
   ]);
 
   const displayName = profile?.full_name || "Verified Student";
@@ -252,6 +253,111 @@ export default async function ProfilePage() {
             isStandalone
           />
         </section>
+
+        {/* Pending Confirmations & Active Swaps */}
+        {activeTrades.length > 0 && (
+          <section className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-base font-bold text-zinc-950 flex items-center gap-2">
+                  <span>Pending Confirmations</span>
+                  <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                </h2>
+                <p className="text-xs text-zinc-500">
+                  Trades appear in Completed History only after both students verify and confirm receipt.
+                </p>
+              </div>
+              <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200">
+                {activeTrades.length} pending
+              </span>
+            </div>
+
+            <div className="space-y-3">
+              {activeTrades.map((item) => {
+                const partnerName = item.partner?.full_name || "Verified Student";
+                const isNeedCash = item.request_type === "NEED_CASH";
+
+                return (
+                  <div
+                    key={item.id}
+                    className="p-5 bg-white rounded-3xl border border-amber-200 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+                  >
+                    <div className="flex items-start gap-4">
+                      <div
+                        className={`w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 ${
+                          isNeedCash
+                            ? "bg-emerald-50 text-emerald-700 border border-emerald-100"
+                            : "bg-blue-50 text-blue-700 border border-blue-100"
+                        }`}
+                      >
+                        {isNeedCash ? (
+                          <Banknote className="w-5 h-5" />
+                        ) : (
+                          <Smartphone className="w-5 h-5" />
+                        )}
+                      </div>
+
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-black font-mono text-zinc-950">
+                            ₹{item.amount}
+                          </span>
+                          <span
+                            className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                              isNeedCash
+                                ? "bg-emerald-100/70 text-emerald-800"
+                                : "bg-blue-100/70 text-blue-800"
+                            }`}
+                          >
+                            {isNeedCash ? "Need Cash" : "Have Cash Want UPI"}
+                          </span>
+                        </div>
+
+                        <div className="text-xs text-zinc-600 flex items-center gap-1.5">
+                          <span>Partner: <strong>{partnerName}</strong></span>
+                          <span>•</span>
+                          <span className="flex items-center gap-1 text-zinc-500">
+                            <MapPin className="w-3 h-3 text-blue-600" />
+                            {item.meetup_location}
+                          </span>
+                        </div>
+
+                        <div className="pt-1">
+                          {item.myConfirmed && !item.partnerConfirmed ? (
+                            <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-amber-800 bg-amber-50 px-2.5 py-0.5 rounded-lg border border-amber-200">
+                              <Clock className="w-3 h-3 text-amber-600" />
+                              You confirmed receipt • Waiting for partner confirmation ({partnerName} has not confirmed yet)
+                            </span>
+                          ) : !item.myConfirmed && item.partnerConfirmed ? (
+                            <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-emerald-800 bg-emerald-50 px-2.5 py-0.5 rounded-lg border border-emerald-200">
+                              <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                              {partnerName} confirmed! Waiting for your confirmation
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-zinc-600 bg-zinc-100 px-2.5 py-0.5 rounded-lg border border-zinc-200">
+                              <Clock className="w-3 h-3 text-zinc-500" />
+                              Waiting for meetup & confirmations
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="shrink-0 self-end sm:self-center">
+                      <Link
+                        href={`/trades/${item.id}`}
+                        className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs transition-all shadow-sm"
+                      >
+                        Trade Room
+                        <ArrowRight className="w-4 h-4" />
+                      </Link>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        )}
 
         {/* Trade History Section */}
         <section className="space-y-4">

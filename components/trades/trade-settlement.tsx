@@ -3,7 +3,7 @@
 import * as React from "react";
 import { useState, useEffect } from "react";
 import { Trade } from "@/types/database";
-import { confirmTradeSettlementAction } from "@/lib/trades/actions";
+import { confirmTradeSettlementAction, getTradeById } from "@/lib/trades/actions";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import {
@@ -26,6 +26,7 @@ interface TradeSettlementProps {
   currentUserId: string;
   partnerName: string;
   onTradeStatusChange?: (newStatus: string) => void;
+  onTradeUpdate?: (updatedTrade: Trade) => void;
 }
 
 export function TradeSettlement({
@@ -33,6 +34,7 @@ export function TradeSettlement({
   currentUserId,
   partnerName,
   onTradeStatusChange,
+  onTradeUpdate,
 }: TradeSettlementProps) {
   const router = useRouter();
 
@@ -41,6 +43,11 @@ export function TradeSettlement({
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [hasCheckedNotice, setHasCheckedNotice] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Keep local state in sync if initial prop changes
+  useEffect(() => {
+    setTrade(initialTrade);
+  }, [initialTrade]);
 
   const isRequester = currentUserId === trade.requester_id;
   const isNeedCash = trade.request_type === "NEED_CASH";
@@ -55,39 +62,136 @@ export function TradeSettlement({
 
   const isCompleted = trade.status === "COMPLETED";
 
+  // Secure fallback trade refresher respecting RLS
+  const refreshTrade = React.useCallback(async () => {
+    try {
+      const res = await getTradeById(trade.id);
+      if (res.trade) {
+        setTrade((prev) => {
+          const next = { ...prev, ...res.trade! };
+          if (next.status && onTradeStatusChange) {
+            onTradeStatusChange(next.status);
+          }
+          if (onTradeUpdate) {
+            onTradeUpdate(next);
+          }
+          return next;
+        });
+      }
+    } catch (err) {
+      if (process.env.NODE_ENV === "development") {
+        console.warn("[TradeSettlement Fallback Refresh Error]:", err);
+      }
+    }
+  }, [trade.id, onTradeStatusChange, onTradeUpdate]);
+
   // Realtime subscription to trade settlement updates
   useEffect(() => {
     const supabase = createClient();
     if (!supabase) return;
 
-    const channel = supabase
-      .channel(`trade_settlement_${trade.id}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "UPDATE",
-          schema: "public",
-          table: "trades",
-          filter: `id=eq.${trade.id}`,
-        },
-        (payload) => {
-          const updated = payload.new as Partial<Trade>;
-          setTrade((prev) => {
-            const next = { ...prev, ...updated };
-            if (next.status && onTradeStatusChange) {
-              onTradeStatusChange(next.status);
-            }
-            return next;
-          });
-          router.refresh();
+    let isMounted = true;
+    let authSub: { unsubscribe: () => void } | null = null;
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+
+    const initSubscription = async () => {
+      // 1. Ensure access token is set on Realtime WebSocket for RLS authorization
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.access_token) {
+          await supabase.realtime.setAuth(session.access_token);
         }
-      )
-      .subscribe();
+      } catch (err) {
+        if (process.env.NODE_ENV === "development") {
+          console.warn("[TradeSettlement Auth Warning]:", err);
+        }
+      }
+
+      // Listen for session refresh
+      const { data } = supabase.auth.onAuthStateChange(async (_event: unknown, session: { access_token?: string } | null) => {
+        if (session?.access_token) {
+          try {
+            await supabase.realtime.setAuth(session.access_token);
+          } catch {
+            // ignore
+          }
+        }
+      });
+      authSub = data.subscription;
+
+      if (!isMounted) return;
+
+      // 2. Subscribe to UPDATE on this specific trade row
+      channel = supabase
+        .channel(`trade_settlement_${trade.id}`)
+        .on(
+          "postgres_changes" as any,
+          {
+            event: "UPDATE",
+            schema: "public",
+            table: "trades",
+            filter: `id=eq.${trade.id}`,
+          },
+          (payload: { new: Record<string, any> }) => {
+            const updated = payload.new as Partial<Trade>;
+            setTrade((prev) => {
+              const next = { ...prev, ...updated };
+              if (next.status && onTradeStatusChange) {
+                onTradeStatusChange(next.status);
+              }
+              if (onTradeUpdate) {
+                onTradeUpdate(next);
+              }
+              return next;
+            });
+            router.refresh();
+          }
+        )
+        .subscribe((status: string, err?: unknown) => {
+          if (!isMounted) return;
+
+          if (process.env.NODE_ENV === "development") {
+            if (err) {
+              console.error(`[TradeSettlement Realtime Error] Status: ${status}`, err);
+            } else {
+              console.log(`[TradeSettlement Realtime Status]: ${status}`);
+            }
+          }
+
+          if (status === "SUBSCRIBED") {
+            refreshTrade();
+          }
+        });
+    };
+
+    initSubscription();
+
+    // 3. Fallback refresh when tab becomes visible again
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        refreshTrade();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    // 4. Polling fallback while trade is not yet completed
+    const interval = setInterval(() => {
+      if (!isCompleted) {
+        refreshTrade();
+      }
+    }, 7000);
 
     return () => {
-      supabase.removeChannel(channel);
+      isMounted = false;
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      clearInterval(interval);
+      if (authSub) authSub.unsubscribe();
+      if (channel) {
+        supabase.removeChannel(channel);
+      }
     };
-  }, [trade.id, onTradeStatusChange, router]);
+  }, [trade.id, onTradeStatusChange, onTradeUpdate, router, refreshTrade, isCompleted]);
+
 
   // Determine what I am confirming receipt of:
   // NEED_CASH: Requester confirms CASH receipt; Fulfiller confirms UPI receipt
@@ -130,6 +234,9 @@ export function TradeSettlement({
         };
         if (next.status && onTradeStatusChange) {
           onTradeStatusChange(next.status);
+        }
+        if (onTradeUpdate) {
+          onTradeUpdate(next);
         }
         return next;
       });

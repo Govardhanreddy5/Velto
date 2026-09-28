@@ -1,4 +1,5 @@
 import { checkUserRouting } from "@/lib/profile/actions";
+import { getActiveUserTrades } from "@/lib/trades/actions";
 import { signOutAction } from "@/lib/auth/actions";
 import { redirect } from "next/navigation";
 import Link from "next/link";
@@ -55,6 +56,8 @@ export default async function DashboardPage() {
   const ratingAvg = Number(profile?.rating_avg || 5.0).toFixed(1);
   const totalTrades = profile?.total_trades || 0;
   const totalRatings = profile?.total_ratings || 0;
+
+  const activeTrades = await getActiveUserTrades();
 
   return (
     <div className="min-h-screen bg-zinc-50 text-zinc-900 font-sans">
@@ -241,6 +244,109 @@ export default async function DashboardPage() {
             <ArrowRight className="w-4 h-4" />
           </Link>
         </div>
+
+        {/* Active Trades in Progress Section */}
+        {activeTrades.length > 0 && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-bold text-zinc-950 flex items-center gap-2">
+                  <span>Active Trades in Progress</span>
+                  <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+                </h2>
+                <p className="text-xs text-zinc-500">
+                  You have active peer swaps awaiting meetup or receipt confirmation.
+                </p>
+              </div>
+              <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+                {activeTrades.length} active
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4">
+              {activeTrades.map((trade) => {
+                const partnerName = trade.partner?.full_name || "Verified Student";
+                const isNeedCash = trade.request_type === "NEED_CASH";
+
+                return (
+                  <div
+                    key={trade.id}
+                    className="p-5 bg-white rounded-2xl border border-blue-200 shadow-sm hover:shadow-md transition-all flex flex-col md:flex-row md:items-center justify-between gap-4"
+                  >
+                    <div className="flex items-start gap-4">
+                      <div
+                        className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${
+                          isNeedCash
+                            ? "bg-emerald-50 text-emerald-700 border border-emerald-100"
+                            : "bg-blue-50 text-blue-700 border border-blue-100"
+                        }`}
+                      >
+                        {isNeedCash ? (
+                          <Banknote className="w-6 h-6" />
+                        ) : (
+                          <Smartphone className="w-6 h-6" />
+                        )}
+                      </div>
+
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-base font-black font-mono text-zinc-950">
+                            ₹{trade.amount}
+                          </span>
+                          <span
+                            className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                              isNeedCash
+                                ? "bg-emerald-100/70 text-emerald-800"
+                                : "bg-blue-100/70 text-blue-800"
+                            }`}
+                          >
+                            {isNeedCash ? "Need Cash" : "Have Cash (Want UPI)"}
+                          </span>
+                        </div>
+
+                        <div className="text-xs text-zinc-600 flex items-center gap-2">
+                          <span>Trading with <strong>{partnerName}</strong></span>
+                          <span>•</span>
+                          <span className="text-zinc-500">{trade.meetup_location}</span>
+                        </div>
+
+                        {/* Status notification */}
+                        <div className="pt-1">
+                          {trade.myConfirmed && !trade.partnerConfirmed ? (
+                            <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-amber-800 bg-amber-50 px-2.5 py-0.5 rounded-lg border border-amber-200">
+                              <Clock className="w-3 h-3 text-amber-600" />
+                              You confirmed receipt • Waiting for {partnerName} to confirm
+                            </span>
+                          ) : !trade.myConfirmed && trade.partnerConfirmed ? (
+                            <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-emerald-800 bg-emerald-50 px-2.5 py-0.5 rounded-lg border border-emerald-200">
+                              <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                              {partnerName} has confirmed receipt! Please verify & confirm.
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-blue-700 bg-blue-50 px-2.5 py-0.5 rounded-lg border border-blue-200">
+                              <Clock className="w-3 h-3 text-blue-600" />
+                              Meetup & swap in progress
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="shrink-0 self-end md:self-center">
+                      <Link
+                        href={`/trades/${trade.id}`}
+                        className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-sm transition-all"
+                      >
+                        Open Trade Room
+                        <ArrowRight className="w-4 h-4" />
+                      </Link>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Primary Action Cards for Creating Requests */}
         <div className="space-y-4">

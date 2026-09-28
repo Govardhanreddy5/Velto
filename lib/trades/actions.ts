@@ -374,6 +374,7 @@ export async function confirmTradeSettlementAction(
   revalidatePath(`/trades/${tradeId}`);
   revalidatePath("/dashboard");
   revalidatePath("/feed");
+  revalidatePath("/profile");
 
   return result;
 }
@@ -527,6 +528,7 @@ export async function getUserTradeHistory(): Promise<TradeHistoryItem[]> {
       )
     `)
     .eq("status", "COMPLETED")
+    .not("completed_at", "is", null)
     .or(`requester_id.eq.${user.id},fulfiller_id.eq.${user.id}`)
     .order("completed_at", { ascending: false });
 
@@ -566,3 +568,98 @@ export async function getUserTradeHistory(): Promise<TradeHistoryItem[]> {
     };
   });
 }
+
+export interface ActiveTradeItem {
+  id: string;
+  request_id: string;
+  amount: number;
+  request_type: string;
+  status: string;
+  meetup_location: string;
+  started_at: string;
+  requester_confirmed: boolean;
+  fulfiller_confirmed: boolean;
+  isRequester: boolean;
+  myConfirmed: boolean;
+  partnerConfirmed: boolean;
+  partner: {
+    id: string;
+    full_name: string | null;
+    department: string | null;
+    year_of_study: number | null;
+    roll_number: string;
+    rating_avg: number;
+    total_trades: number;
+    avatar_url?: string | null;
+  } | null;
+}
+
+/**
+ * Server action to retrieve currently active trades (status = IN_PROGRESS)
+ * where the user is either requester or fulfiller.
+ */
+export async function getActiveUserTrades(): Promise<ActiveTradeItem[]> {
+  const supabase = await createClient();
+  if (!supabase) return [];
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return [];
+
+  const { data: trades, error } = await supabase
+    .from("trades")
+    .select(`
+      id,
+      request_id,
+      requester_id,
+      fulfiller_id,
+      amount,
+      request_type,
+      status,
+      meetup_location,
+      requester_confirmed,
+      fulfiller_confirmed,
+      started_at,
+      requester:profiles!trades_requester_id_fkey(
+        id, full_name, department, year_of_study, roll_number, rating_avg, total_trades, avatar_url
+      ),
+      fulfiller:profiles!trades_fulfiller_id_fkey(
+        id, full_name, department, year_of_study, roll_number, rating_avg, total_trades, avatar_url
+      )
+    `)
+    .eq("status", "IN_PROGRESS")
+    .or(`requester_id.eq.${user.id},fulfiller_id.eq.${user.id}`)
+    .order("started_at", { ascending: false });
+
+  if (error || !trades) {
+    console.error("Error fetching active trades:", error);
+    return [];
+  }
+
+  return trades.map((t) => {
+    const isRequester = t.requester_id === user.id;
+    const partnerData = isRequester ? t.fulfiller : t.requester;
+    const partner = Array.isArray(partnerData) ? partnerData[0] : partnerData;
+    const myConfirmed = isRequester ? t.requester_confirmed : t.fulfiller_confirmed;
+    const partnerConfirmed = isRequester ? t.fulfiller_confirmed : t.requester_confirmed;
+
+    return {
+      id: t.id,
+      request_id: t.request_id,
+      amount: Number(t.amount),
+      request_type: t.request_type,
+      status: t.status,
+      meetup_location: t.meetup_location,
+      started_at: t.started_at,
+      requester_confirmed: t.requester_confirmed,
+      fulfiller_confirmed: t.fulfiller_confirmed,
+      isRequester,
+      myConfirmed,
+      partnerConfirmed,
+      partner: partner || null,
+    };
+  });
+}
+

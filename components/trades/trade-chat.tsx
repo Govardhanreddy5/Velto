@@ -3,7 +3,7 @@
 import * as React from "react";
 import { useState, useEffect, useRef } from "react";
 import { TradeMessage } from "@/types/database";
-import { sendTradeMessageAction } from "@/lib/trades/actions";
+import { sendTradeMessageAction, getTradeMessages } from "@/lib/trades/actions";
 import { createClient } from "@/lib/supabase/client";
 import {
   Send,
@@ -62,56 +62,151 @@ export function TradeChat({
     scrollToBottom(true);
   }, [messages]);
 
+  // Secure fallback message refresher respecting RLS
+  const refreshMessages = React.useCallback(async () => {
+    try {
+      const res = await getTradeMessages(tradeId);
+      if (res.messages && res.messages.length > 0) {
+        setMessages((prev) => {
+          const map = new Map(prev.map((m) => [m.id, m]));
+          for (const m of res.messages) {
+            if (!map.has(m.id)) {
+              map.set(m.id, m);
+            }
+          }
+          return Array.from(map.values()).sort(
+            (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+          );
+        });
+      }
+    } catch (err) {
+      if (process.env.NODE_ENV === "development") {
+        console.warn("[TradeChat Fallback Refresh Error]:", err);
+      }
+    }
+  }, [tradeId]);
+
   // Set up Supabase Realtime channel for in-trade chat
   useEffect(() => {
     const supabase = createClient();
     if (!supabase) return;
 
-    const channel = supabase
-      .channel(`trade_chat_${tradeId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "trade_messages",
-          filter: `trade_id=eq.${tradeId}`,
-        },
-        async (payload) => {
-          const newMsg = payload.new as TradeMessage;
+    let isMounted = true;
+    let authSub: { unsubscribe: () => void } | null = null;
+    let channel: ReturnType<typeof supabase.channel> | null = null;
 
-          // Prevent duplicate message if already added by sender's optimistic update
-          setMessages((prev) => {
-            if (prev.some((m) => m.id === newMsg.id)) {
-              return prev;
-            }
-
-            // If the incoming message belongs to partner, attach partner name if sender profile is missing in payload
-            const enriched: TradeMessage = {
-              ...newMsg,
-              sender:
-                newMsg.sender ||
-                (newMsg.sender_id === currentUserId
-                  ? undefined
-                  : { full_name: partnerName }),
-            };
-
-            return [...prev, enriched];
-          });
+    const initSubscription = async () => {
+      // 1. Ensure access token is set on Realtime WebSocket for RLS authorization
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.access_token) {
+          await supabase.realtime.setAuth(session.access_token);
         }
-      )
-      .subscribe((status) => {
-        if (status === "SUBSCRIBED") {
-          setRealtimeStatus("connected");
-        } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
-          setRealtimeStatus("error");
+      } catch (err) {
+        if (process.env.NODE_ENV === "development") {
+          console.warn("[TradeChat Auth Init Warning]:", err);
+        }
+      }
+
+      // Listen for session refresh to keep Realtime authorized
+      const { data } = supabase.auth.onAuthStateChange(async (_event: unknown, session: { access_token?: string } | null) => {
+        if (session?.access_token) {
+          try {
+            await supabase.realtime.setAuth(session.access_token);
+          } catch {
+            // ignore
+          }
         }
       });
+      authSub = data.subscription;
+
+      if (!isMounted) return;
+
+      // 2. Create channel with strict trade filter
+      channel = supabase
+        .channel(`trade_chat_${tradeId}`)
+        .on(
+          "postgres_changes" as any,
+          {
+            event: "INSERT",
+            schema: "public",
+            table: "trade_messages",
+            filter: `trade_id=eq.${tradeId}`,
+          },
+          (payload: { new: Record<string, any> }) => {
+            const newMsg = payload.new as TradeMessage;
+
+            // Deduplicate: append once
+            setMessages((prev) => {
+              if (prev.some((m) => m.id === newMsg.id)) {
+                return prev;
+              }
+
+              // Enrich partner name if missing from raw WAL payload
+              const enriched: TradeMessage = {
+                ...newMsg,
+                sender:
+                  newMsg.sender ||
+                  (newMsg.sender_id === currentUserId
+                    ? undefined
+                    : { full_name: partnerName }),
+              };
+
+              return [...prev, enriched];
+            });
+          }
+        )
+        .subscribe((status: string, err?: unknown) => {
+          if (!isMounted) return;
+
+          if (process.env.NODE_ENV === "development") {
+            if (err) {
+              console.error(`[TradeChat Subscription Error] Status: ${status}`, err);
+            } else {
+              console.log(`[TradeChat Realtime Status]: ${status}`);
+            }
+          }
+
+          if (status === "SUBSCRIBED") {
+            setRealtimeStatus("connected");
+            // Sync any messages missed during connecting phase
+            refreshMessages();
+          } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
+            setRealtimeStatus("error");
+          } else {
+            setRealtimeStatus("connecting");
+          }
+        });
+    };
+
+    initSubscription();
+
+    // 3. Fallback refresh when tab becomes visible again
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        refreshMessages();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    // 4. Fallback interval if realtime is offline or connecting
+    const fallbackInterval = setInterval(() => {
+      if (realtimeStatus !== "connected") {
+        refreshMessages();
+      }
+    }, 6000);
 
     return () => {
-      supabase.removeChannel(channel);
+      isMounted = false;
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      clearInterval(fallbackInterval);
+      if (authSub) authSub.unsubscribe();
+      if (channel) {
+        supabase.removeChannel(channel);
+      }
     };
-  }, [tradeId, currentUserId, partnerName]);
+  }, [tradeId, currentUserId, partnerName, refreshMessages, realtimeStatus]);
+
 
   const handleSendMessage = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
