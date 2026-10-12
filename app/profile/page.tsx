@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AvatarPicker } from "@/components/profile/avatar-picker";
+import { NotificationSettings } from "@/components/profile/notification-settings";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -257,6 +258,9 @@ export default async function ProfilePage() {
             isStandalone
           />
         </section>
+
+        {/* Web Push Notification Settings Section */}
+        <NotificationSettings />
 
         {/* Pending Confirmations & Active Swaps */}
         {activeTrades.length > 0 && (

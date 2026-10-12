@@ -5,6 +5,7 @@ import { validateCreateRequestData } from "@/lib/requests/validation";
 import { getCampusForEmail, isApprovedCampus } from "@/lib/auth/validation";
 import { ExchangeRequest } from "@/types/database";
 import { revalidatePath } from "next/cache";
+import { dispatchPushNotificationForRequest } from "@/lib/push/server";
 
 export interface CreateRequestResponse {
   success: boolean;
@@ -120,6 +121,21 @@ export async function createRequestAction(
       success: false,
       message: `Failed to create request: ${insertError.message}`,
     };
+  }
+
+  // Dispatch background push notifications to eligible opted-in students
+  try {
+    dispatchPushNotificationForRequest({
+      requestId: newRequest.id,
+      requestType,
+      amount: numericAmount,
+      locationHint: location,
+      requesterId: user.id,
+    }).catch((err) => {
+      console.warn("[Velto Push] Asynchronous push dispatch warning:", err);
+    });
+  } catch (err) {
+    console.warn("[Velto Push] Dispatch initialization warning:", err);
   }
 
   revalidatePath("/feed");

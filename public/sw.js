@@ -1,6 +1,6 @@
 // Velto Progressive Web App - Service Worker
-// Cache version: v1
-const CACHE_NAME = "velto-cache-v1";
+// Cache version: v2
+const CACHE_NAME = "velto-cache-v2";
 const OFFLINE_URL = "/offline";
 
 // Safe static assets to precache on install
@@ -50,7 +50,11 @@ function isStaticAsset(url) {
   if (urlObj.pathname.startsWith("/icons/")) return true;
   if (urlObj.pathname.startsWith("/images/")) return true;
   if (urlObj.pathname === "/favicon.ico") return true;
-  if (urlObj.pathname === "/manifest.webmanifest" || urlObj.pathname === "/manifest.json") return true;
+  if (
+    urlObj.pathname === "/manifest.webmanifest" ||
+    urlObj.pathname === "/manifest.json"
+  )
+    return true;
 
   return false;
 }
@@ -109,7 +113,6 @@ self.addEventListener("fetch", (event) => {
     event.respondWith(
       fetch(request)
         .then((response) => {
-          // If network succeeds, return page
           return response;
         })
         .catch(async () => {
@@ -119,11 +122,14 @@ self.addEventListener("fetch", (event) => {
           if (cachedOffline) {
             return cachedOffline;
           }
-          return new Response("You are currently offline. Please reconnect to access Velto.", {
-            status: 503,
-            statusText: "Service Unavailable",
-            headers: { "Content-Type": "text/plain" },
-          });
+          return new Response(
+            "You are currently offline. Please reconnect to access Velto.",
+            {
+              status: 503,
+              statusText: "Service Unavailable",
+              headers: { "Content-Type": "text/plain" },
+            }
+          );
         })
     );
     return;
@@ -134,7 +140,6 @@ self.addEventListener("fetch", (event) => {
     event.respondWith(
       caches.match(request).then((cachedResponse) => {
         if (cachedResponse) {
-          // Stale-while-revalidate for background updates
           fetch(request)
             .then((networkResponse) => {
               if (networkResponse && networkResponse.status === 200) {
@@ -143,13 +148,10 @@ self.addEventListener("fetch", (event) => {
                 });
               }
             })
-            .catch(() => {
-              // Ignore background update errors
-            });
+            .catch(() => {});
           return cachedResponse;
         }
 
-        // Cache miss: fetch from network and cache
         return fetch(request).then((networkResponse) => {
           if (networkResponse && networkResponse.status === 200) {
             const responseClone = networkResponse.clone();
@@ -163,6 +165,71 @@ self.addEventListener("fetch", (event) => {
     );
     return;
   }
+});
 
-  // 4. Default: Network-only for all other requests
+// ============================================================
+// WEB PUSH NOTIFICATION LISTENERS
+// ============================================================
+
+// 1. Push Event: Native notification display
+self.addEventListener("push", (event) => {
+  let payload = {};
+  if (event.data) {
+    try {
+      payload = event.data.json();
+    } catch {
+      payload = { body: event.data.text() };
+    }
+  }
+
+  // Strict safe fallback parameters
+  const title = payload.title || "New Velto exchange request";
+  const body =
+    payload.body ||
+    "A student posted a new cash ↔ UPI exchange request on campus.";
+  const icon = payload.icon || "/icons/icon-192x192.png";
+  const badge = payload.badge || "/icons/icon-192x192.png";
+  const targetUrl = payload.url || (payload.data && payload.data.url) || "/feed";
+
+  const options = {
+    body,
+    icon,
+    badge,
+    data: {
+      url: targetUrl,
+      timestamp: Date.now(),
+    },
+    tag: payload.tag || `velto-req-${Date.now()}`,
+    renotify: true,
+    vibrate: [150, 80, 150],
+  };
+
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+// 2. Notification Click Event: Focus existing window or open app deep link
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const targetUrl = event.notification.data?.url || "/feed";
+
+  event.waitUntil(
+    self.clients
+      .matchAll({ type: "window", includeUncontrolled: true })
+      .then((clientList) => {
+        // If a window is already open on this origin, focus and navigate it
+        for (const client of clientList) {
+          if ("focus" in client && client.url.includes(self.location.origin)) {
+            client.focus();
+            if ("navigate" in client) {
+              return client.navigate(targetUrl);
+            }
+            return;
+          }
+        }
+        // Otherwise, open a new window to the target URL
+        if (self.clients.openWindow) {
+          return self.clients.openWindow(targetUrl);
+        }
+      })
+  );
 });
