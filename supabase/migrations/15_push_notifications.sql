@@ -135,7 +135,7 @@ $$;
 
 -- 7. SECURITY DEFINER RPC: Delete User's Push Subscription
 CREATE OR REPLACE FUNCTION public.delete_push_subscription(
-    p_endpoint TEXT
+    p_endpoint TEXT DEFAULT NULL
 )
 RETURNS BOOLEAN
 LANGUAGE plpgsql
@@ -150,8 +150,13 @@ BEGIN
         RAISE EXCEPTION 'Unauthenticated request';
     END IF;
 
-    DELETE FROM public.push_subscriptions
-    WHERE endpoint = p_endpoint AND user_id = v_user_id;
+    IF p_endpoint IS NOT NULL AND p_endpoint <> '' THEN
+        DELETE FROM public.push_subscriptions
+        WHERE endpoint = p_endpoint AND user_id = v_user_id;
+    ELSE
+        DELETE FROM public.push_subscriptions
+        WHERE user_id = v_user_id;
+    END IF;
 
     RETURN FOUND;
 END;
