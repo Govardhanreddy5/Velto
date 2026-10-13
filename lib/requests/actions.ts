@@ -123,19 +123,17 @@ export async function createRequestAction(
     };
   }
 
-  // Dispatch background push notifications to eligible opted-in students
+  // Dispatch push notifications to eligible opted-in students (awaited for serverless runtime completion)
   try {
-    dispatchPushNotificationForRequest({
+    await dispatchPushNotificationForRequest({
       requestId: newRequest.id,
       requestType,
       amount: numericAmount,
       locationHint: location,
       requesterId: user.id,
-    }).catch((err) => {
-      console.warn("[Velto Push] Asynchronous push dispatch warning:", err);
     });
   } catch (err) {
-    console.warn("[Velto Push] Dispatch initialization warning:", err);
+    console.warn("[Velto Push] Non-fatal push dispatch warning:", err);
   }
 
   revalidatePath("/feed");
@@ -187,7 +185,10 @@ export async function cancelRequestAction(requestId: string): Promise<{
  * Fetches active public campus feed requests (excluding current user's own requests).
  * Excludes UPI ID entirely to preserve student privacy.
  */
-export async function getFeedRequests(): Promise<{
+export async function getFeedRequests(
+  prefetchedUserId?: string,
+  prefetchedCampus?: string
+): Promise<{
   requests: ExchangeRequest[];
   currentUserId: string | null;
   campus: string;
@@ -197,24 +198,34 @@ export async function getFeedRequests(): Promise<{
     return { requests: [], currentUserId: null, campus: "" };
   }
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  let userId = prefetchedUserId;
+  let campus = prefetchedCampus;
 
-  if (!user) {
-    return { requests: [], currentUserId: null, campus: "" };
+  if (!userId) {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      return { requests: [], currentUserId: null, campus: "" };
+    }
+    userId = user.id;
+
+    if (!campus) {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("campus")
+        .eq("id", user.id)
+        .single();
+
+      campus =
+        profile?.campus ||
+        getCampusForEmail(user.email || "") ||
+        "Vishnu Educational Society";
+    }
   }
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("campus")
-    .eq("id", user.id)
-    .single();
-
-  const campus =
-    profile?.campus ||
-    getCampusForEmail(user.email || "") ||
-    "Vishnu Educational Society";
+  const activeCampus = campus || "Vishnu Educational Society";
   const now = new Date().toISOString();
 
   // Query open, unexpired requests from the shared two-college marketplace
@@ -251,7 +262,7 @@ export async function getFeedRequests(): Promise<{
 
   if (error) {
     console.error("Error fetching feed:", error);
-    return { requests: [], currentUserId: user.id, campus };
+    return { requests: [], currentUserId: userId || null, campus: activeCampus };
   }
 
   // Sanitize requester object if array
@@ -267,28 +278,32 @@ export async function getFeedRequests(): Promise<{
 
   return {
     requests: formatted,
-    currentUserId: user.id,
-    campus,
+    currentUserId: userId || null,
+    campus: activeCampus,
   };
 }
 
 /**
  * Fetches requests created by the authenticated student.
  */
-export async function getMyRequests(): Promise<ExchangeRequest[]> {
+export async function getMyRequests(prefetchedUserId?: string): Promise<ExchangeRequest[]> {
   const supabase = await createClient();
   if (!supabase) return [];
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  let userId = prefetchedUserId;
+  if (!userId) {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
-  if (!user) return [];
+    if (!user) return [];
+    userId = user.id;
+  }
 
   const { data, error } = await supabase
     .from("exchange_requests")
     .select("*")
-    .eq("requester_id", user.id)
+    .eq("requester_id", userId)
     .order("created_at", { ascending: false });
 
   if (error) {

@@ -22,13 +22,25 @@ export async function createClient() {
       setAll(cookiesToSet) {
         try {
           cookiesToSet.forEach(({ name, value, options }) =>
-            cookieStore.set(name, value, options)
+            cookieStore.set(name, value, {
+              ...options,
+              maxAge: options?.maxAge ?? 60 * 60 * 24 * 30, // 30-day persistent cookie
+              sameSite: options?.sameSite ?? "lax",
+              path: options?.path ?? "/",
+              secure: process.env.NODE_ENV === "production",
+            })
           );
         } catch {
           // The `setAll` method was called from a Server Component.
-          // This can be ignored if you have middleware refreshing user sessions.
+          // This can be ignored because middleware refreshes user sessions.
         }
       },
+    },
+    cookieOptions: {
+      maxAge: 60 * 60 * 24 * 30, // 30 days
+      sameSite: "lax",
+      path: "/",
+      secure: process.env.NODE_ENV === "production",
     },
   });
 }

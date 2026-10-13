@@ -29,8 +29,8 @@ export default async function FeedPage() {
   }
 
   const [feedData, myRequests] = await Promise.all([
-    getFeedRequests(),
-    getMyRequests(),
+    getFeedRequests(routing.user?.id, routing.profile?.campus),
+    getMyRequests(routing.user?.id),
   ]);
 
   const profile = routing.profile;

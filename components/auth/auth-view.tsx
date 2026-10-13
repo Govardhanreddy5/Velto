@@ -4,17 +4,20 @@ import * as React from "react";
 import { useState } from "react";
 import { SignUpForm } from "./signup-form";
 import { LoginForm } from "./login-form";
-import { ShieldCheck, ArrowLeft, Shield } from "lucide-react";
+import { ShieldCheck, ArrowLeft, Shield, Clock } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 
 export function AuthView() {
   const searchParams = useSearchParams();
   const requestedMode = searchParams.get("mode");
+  const reason = searchParams.get("reason");
+  const isSessionExpired = reason === "session_expired";
+
   const initialMode: "signup" | "signin" | "admin" =
     requestedMode === "admin"
       ? "admin"
-      : requestedMode === "signin"
+      : requestedMode === "signin" || isSessionExpired
       ? "signin"
       : "signup";
 
@@ -83,6 +86,19 @@ export function AuthView() {
               : "Restricted platform administrator login."}
           </p>
         </div>
+
+        {/* Expired Session Graceful Banner */}
+        {isSessionExpired && mode === "signin" && (
+          <div className="relative mb-5 p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs flex items-start gap-2.5 text-left">
+            <Clock className="w-4 h-4 shrink-0 mt-0.5 text-amber-400" />
+            <div>
+              <p className="font-semibold text-amber-200">Session Expired</p>
+              <p className="text-[11px] text-amber-300/80 mt-0.5 leading-relaxed">
+                Your previous student session has expired for your account security. Please sign in to resume your campus activities.
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Tab Toggle Switch */}
         <div className="relative grid grid-cols-3 p-1 mb-6 rounded-lg bg-zinc-950/70 border border-zinc-800 text-xs font-semibold">

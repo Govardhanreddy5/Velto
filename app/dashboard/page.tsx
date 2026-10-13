@@ -61,7 +61,7 @@ export default async function DashboardPage() {
   const totalTrades = profile?.total_trades || 0;
   const totalRatings = profile?.total_ratings || 0;
 
-  const activeTrades = await getActiveUserTrades();
+  const activeTrades = await getActiveUserTrades(user?.id);
 
   return (
     <div className="min-h-screen bg-zinc-50 text-zinc-900 font-sans">

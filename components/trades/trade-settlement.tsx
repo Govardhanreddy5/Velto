@@ -148,7 +148,6 @@ export function TradeSettlement({
               }
               return next;
             });
-            router.refresh();
           }
         )
         .subscribe((status: string, err?: unknown) => {
@@ -244,8 +243,6 @@ export function TradeSettlement({
         }
         return next;
       });
-
-      router.refresh();
     } catch {
       setErrorMessage("Network error confirming receipt. Please try again.");
     } finally {

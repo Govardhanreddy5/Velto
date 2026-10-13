@@ -2,7 +2,6 @@
 
 import * as React from "react";
 import { useState, useEffect, useMemo } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ExchangeRequest, RequestType } from "@/types/database";
 import { RequestCard } from "./request-card";
@@ -29,13 +28,25 @@ export function FeedView({
   campus,
   currentUserId,
 }: FeedViewProps) {
-  const router = useRouter();
-
   const [activeTab, setActiveTab] = useState<"feed" | "my">("feed");
   const [filterType, setFilterType] = useState<"ALL" | RequestType>("ALL");
   const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [acceptTargetRequest, setAcceptTargetRequest] = useState<ExchangeRequest | null>(null);
   const [now, setNow] = useState<number>(0);
+
+  const [prevInitialFeed, setPrevInitialFeed] = useState(initialFeedRequests);
+  const [feedRequests, setFeedRequests] = useState<ExchangeRequest[]>(initialFeedRequests);
+  if (prevInitialFeed !== initialFeedRequests) {
+    setPrevInitialFeed(initialFeedRequests);
+    setFeedRequests(initialFeedRequests);
+  }
+
+  const [prevInitialMy, setPrevInitialMy] = useState(initialMyRequests);
+  const [myRequests, setMyRequests] = useState<ExchangeRequest[]>(initialMyRequests);
+  if (prevInitialMy !== initialMyRequests) {
+    setPrevInitialMy(initialMyRequests);
+    setMyRequests(initialMyRequests);
+  }
 
   // Periodically update time to auto-filter expired requests from view
   useEffect(() => {
@@ -45,7 +56,7 @@ export function FeedView({
     return () => clearInterval(timer);
   }, []);
 
-  // Supabase Realtime Subscription for live updates
+  // Supabase Realtime Subscription for live updates (Local optimistic updates - no full server rerenders)
   useEffect(() => {
     const supabase = createClient();
     if (!supabase) return;
@@ -53,15 +64,47 @@ export function FeedView({
     const channel = supabase
       .channel("feed_exchange_requests")
       .on(
-        "postgres_changes",
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        "postgres_changes" as any,
         {
           event: "*",
           schema: "public",
           table: "exchange_requests",
         },
-        () => {
-          // Re-fetch server data without manual full-page reload
-          router.refresh();
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (payload: { eventType: string; new: Record<string, any>; old: Record<string, any> }) => {
+          if (payload.eventType === "INSERT") {
+            const newReq = payload.new as ExchangeRequest;
+            if (newReq.requester_id === currentUserId) {
+              setMyRequests((prev) => {
+                if (prev.some((r) => r.id === newReq.id)) return prev;
+                return [newReq, ...prev];
+              });
+            } else if (newReq.status === "OPEN") {
+              setFeedRequests((prev) => {
+                if (prev.some((r) => r.id === newReq.id)) return prev;
+                return [newReq, ...prev];
+              });
+            }
+          } else if (payload.eventType === "UPDATE") {
+            const updated = payload.new as ExchangeRequest;
+            if (updated.status !== "OPEN") {
+              setFeedRequests((prev) => prev.filter((r) => r.id !== updated.id));
+            } else {
+              setFeedRequests((prev) =>
+                prev.map((r) => (r.id === updated.id ? { ...r, ...updated } : r))
+              );
+            }
+            setMyRequests((prev) =>
+              prev.map((r) => (r.id === updated.id ? { ...r, ...updated } : r))
+            );
+          } else if (payload.eventType === "DELETE") {
+            const oldId = payload.old?.id;
+            if (oldId) {
+              setFeedRequests((prev) => prev.filter((r) => r.id !== oldId));
+              setMyRequests((prev) => prev.filter((r) => r.id !== oldId));
+            }
+          }
         }
       )
       .subscribe();
@@ -69,13 +112,13 @@ export function FeedView({
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [router]);
+  }, [currentUserId]);
 
   // Filter public feed requests:
   // 1. Must be OPEN
   // 2. Must not be expired
   const visibleFeedRequests = useMemo(() => {
-    return initialFeedRequests.filter((r) => {
+    return feedRequests.filter((r) => {
       const isUnexpired = now === 0 ? true : new Date(r.expires_at).getTime() > now;
       const isOpen = r.status === "OPEN";
       const matchesFilter =
@@ -83,19 +126,25 @@ export function FeedView({
 
       return isUnexpired && isOpen && matchesFilter;
     });
-  }, [initialFeedRequests, now, filterType]);
+  }, [feedRequests, now, filterType]);
 
   const visibleMyRequests = useMemo(() => {
-    if (filterType === "ALL") return initialMyRequests;
-    return initialMyRequests.filter((r) => r.request_type === filterType);
-  }, [initialMyRequests, filterType]);
+    if (filterType === "ALL") return myRequests;
+    return myRequests.filter((r) => r.request_type === filterType);
+  }, [myRequests, filterType]);
 
   const handleCancel = async (id: string) => {
     if (!confirm("Are you sure you want to cancel this request?")) return;
     setCancellingId(id);
+    // Optimistic local removal
+    setMyRequests((prev) => prev.filter((r) => r.id !== id));
+    setFeedRequests((prev) => prev.filter((r) => r.id !== id));
     try {
       await cancelRequestAction(id);
-      router.refresh();
+    } catch {
+      // Revert if error
+      setMyRequests(initialMyRequests);
+      setFeedRequests(initialFeedRequests);
     } finally {
       setCancellingId(null);
     }

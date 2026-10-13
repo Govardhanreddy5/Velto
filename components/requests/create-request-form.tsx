@@ -94,7 +94,6 @@ export function CreateRequestForm({
         setServerError(result.message);
       } else {
         router.push("/feed");
-        router.refresh();
       }
     } catch {
       setServerError("An unexpected error occurred. Please try again.");

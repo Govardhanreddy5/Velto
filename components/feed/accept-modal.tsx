@@ -50,10 +50,7 @@ export function AcceptModal({ request, isOpen, onClose }: AcceptModalProps) {
       }
 
       setIsSuccess(true);
-      // Brief pause to display success feedback before redirection
-      setTimeout(() => {
-        router.push(`/trades/${res.tradeId}`);
-      }, 700);
+      router.push(`/trades/${res.tradeId}`);
     } catch {
       setErrorMessage("An unexpected error occurred. Please try again.");
       setIsSubmitting(false);

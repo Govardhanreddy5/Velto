@@ -11,6 +11,7 @@ import {
   CheckCircle2,
   Loader2,
   Info,
+  Send,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -18,6 +19,7 @@ import {
   removePushSubscriptionAction,
   getPushSubscriptionStatusAction,
   getVapidPublicKeyAction,
+  sendSelfTestPushAction,
 } from "@/lib/push/actions";
 import { urlBase64ToUint8Array } from "@/lib/push/utils";
 
@@ -93,6 +95,7 @@ export function NotificationSettings() {
 
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [testingPush, setTestingPush] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{
     type: "success" | "error" | "info";
     text: string;
@@ -104,11 +107,27 @@ export function NotificationSettings() {
       navigator.serviceWorker.ready.then(async (registration) => {
         try {
           const sub = await registration.pushManager.getSubscription();
+          const dbStatus = await getPushSubscriptionStatusAction();
+
           if (sub) {
+            // Browser has subscription: verify DB sync
+            if (!dbStatus.isSubscribed) {
+              const subJson = sub.toJSON();
+              if (subJson.endpoint && subJson.keys?.p256dh && subJson.keys?.auth) {
+                // Auto-sync missing subscription into database
+                await savePushSubscriptionAction({
+                  endpoint: subJson.endpoint,
+                  keys: {
+                    p256dh: subJson.keys.p256dh,
+                    auth: subJson.keys.auth,
+                  },
+                  userAgent: navigator.userAgent,
+                });
+              }
+            }
             setIsSubscribed(true);
           } else {
-            const dbStatus = await getPushSubscriptionStatusAction();
-            setIsSubscribed(dbStatus.isSubscribed);
+            setIsSubscribed(false);
           }
         } catch {
           // Ignore service worker query errors
@@ -163,8 +182,18 @@ export function NotificationSettings() {
       const vapidKey = await getVapidPublicKeyAction();
       if (!vapidKey) {
         throw new Error(
-          "Push notification service is currently undergoing maintenance. In-app realtime feed remains active."
+          "VAPID public key is not configured in the server environment (NEXT_PUBLIC_VAPID_PUBLIC_KEY). Please add it in Vercel settings."
         );
+      }
+
+      // Unsubscribe any stale mismatched subscription before creating fresh one
+      const existingSub = await registration.pushManager.getSubscription();
+      if (existingSub) {
+        try {
+          await existingSub.unsubscribe();
+        } catch {
+          // Ignore
+        }
       }
 
       // Subscribe to PushManager
@@ -242,6 +271,32 @@ export function NotificationSettings() {
     }
   };
 
+  const handleSendTestNotification = async () => {
+    setTestingPush(true);
+    setStatusMessage(null);
+    try {
+      const res = await sendSelfTestPushAction();
+      if (res.success) {
+        setStatusMessage({
+          type: "success",
+          text: "Test push notification sent! If the app is in the background or minimized, a native notification will appear.",
+        });
+      } else {
+        setStatusMessage({
+          type: "error",
+          text: `Test push failed: ${res.message}`,
+        });
+      }
+    } catch (err: unknown) {
+      setStatusMessage({
+        type: "error",
+        text: `Diagnostic error: ${(err as Error).message}`,
+      });
+    } finally {
+      setTestingPush(false);
+    }
+  };
+
   return (
     <section className="bg-white rounded-3xl border border-zinc-200/90 p-6 sm:p-8 shadow-sm space-y-6">
       {/* Header */}
@@ -270,23 +325,40 @@ export function NotificationSettings() {
           </div>
         </div>
 
-        {/* Action Button */}
-        <div>
+        {/* Action Buttons */}
+        <div className="flex items-center gap-2">
           {isSubscribed ? (
-            <Button
-              onClick={handleDisableNotifications}
-              disabled={loading}
-              variant="outline"
-              size="sm"
-              className="inline-flex items-center gap-1.5 border-zinc-300 text-zinc-700 hover:bg-zinc-100 text-xs px-3.5 py-2 rounded-xl"
-            >
-              {loading ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              ) : (
-                <BellOff className="w-3.5 h-3.5 text-zinc-500" />
-              )}
-              Disable Notifications
-            </Button>
+            <>
+              <Button
+                onClick={handleSendTestNotification}
+                disabled={testingPush || loading}
+                variant="outline"
+                size="sm"
+                className="inline-flex items-center gap-1.5 border-zinc-300 text-blue-600 hover:text-blue-700 hover:bg-blue-50 text-xs px-3 py-2 rounded-xl"
+              >
+                {testingPush ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Send className="w-3.5 h-3.5" />
+                )}
+                Test Push
+              </Button>
+
+              <Button
+                onClick={handleDisableNotifications}
+                disabled={loading || testingPush}
+                variant="outline"
+                size="sm"
+                className="inline-flex items-center gap-1.5 border-zinc-300 text-zinc-700 hover:bg-zinc-100 text-xs px-3.5 py-2 rounded-xl"
+              >
+                {loading ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <BellOff className="w-3.5 h-3.5 text-zinc-500" />
+                )}
+                Disable
+              </Button>
+            </>
           ) : (
             <Button
               onClick={handleEnableNotifications}

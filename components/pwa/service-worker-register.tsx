@@ -9,12 +9,14 @@ export function ServiceWorkerRegister() {
       "serviceWorker" in navigator &&
       window.location.protocol.startsWith("http")
     ) {
-      // Register service worker after window load to preserve initial page load performance
       const register = async () => {
         try {
           const registration = await navigator.serviceWorker.register("/sw.js", {
             scope: "/",
           });
+
+          // Proactively check for newer worker deployed on Vercel
+          registration.update().catch(() => {});
 
           // Check for service worker updates
           registration.addEventListener("updatefound", () => {
@@ -25,9 +27,8 @@ export function ServiceWorkerRegister() {
                   installingWorker.state === "installed" &&
                   navigator.serviceWorker.controller
                 ) {
-                  // A new version is ready in the background
                   console.info(
-                    "[Velto PWA] New app version available in background."
+                    "[Velto PWA] New service worker version installed."
                   );
                 }
               });

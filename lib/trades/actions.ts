@@ -501,15 +501,16 @@ export interface TradeHistoryItem {
 /**
  * Server action to retrieve completed trade history for the signed-in user.
  */
-export async function getUserTradeHistory(): Promise<TradeHistoryItem[]> {
+export async function getUserTradeHistory(prefetchedUserId?: string): Promise<TradeHistoryItem[]> {
   const supabase = await createClient();
   if (!supabase) return [];
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) return [];
+  let userId = prefetchedUserId;
+  if (!userId) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return [];
+    userId = user.id;
+  }
 
   const { data: trades, error } = await supabase
     .from("trades")
@@ -532,7 +533,7 @@ export async function getUserTradeHistory(): Promise<TradeHistoryItem[]> {
     `)
     .eq("status", "COMPLETED")
     .not("completed_at", "is", null)
-    .or(`requester_id.eq.${user.id},fulfiller_id.eq.${user.id}`)
+    .or(`requester_id.eq.${userId},fulfiller_id.eq.${userId}`)
     .order("completed_at", { ascending: false });
 
   if (error || !trades) {
@@ -545,13 +546,13 @@ export async function getUserTradeHistory(): Promise<TradeHistoryItem[]> {
   const { data: ratings } = await supabase
     .from("trade_ratings")
     .select("trade_id, rating")
-    .eq("reviewer_id", user.id)
+    .eq("reviewer_id", userId)
     .in("trade_id", tradeIds.length > 0 ? tradeIds : ["00000000-0000-0000-0000-000000000000"]);
 
   const ratingsMap = new Map((ratings || []).map((r) => [r.trade_id, r.rating]));
 
   return trades.map((t) => {
-    const isRequester = t.requester_id === user.id;
+    const isRequester = t.requester_id === userId;
     const partnerData = isRequester ? t.fulfiller : t.requester;
     const partner = Array.isArray(partnerData) ? partnerData[0] : partnerData;
     const myRating = ratingsMap.get(t.id);
@@ -602,15 +603,16 @@ export interface ActiveTradeItem {
  * Server action to retrieve currently active trades (status = IN_PROGRESS)
  * where the user is either requester or fulfiller.
  */
-export async function getActiveUserTrades(): Promise<ActiveTradeItem[]> {
+export async function getActiveUserTrades(prefetchedUserId?: string): Promise<ActiveTradeItem[]> {
   const supabase = await createClient();
   if (!supabase) return [];
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) return [];
+  let userId = prefetchedUserId;
+  if (!userId) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return [];
+    userId = user.id;
+  }
 
   const { data: trades, error } = await supabase
     .from("trades")
@@ -634,7 +636,7 @@ export async function getActiveUserTrades(): Promise<ActiveTradeItem[]> {
       )
     `)
     .eq("status", "IN_PROGRESS")
-    .or(`requester_id.eq.${user.id},fulfiller_id.eq.${user.id}`)
+    .or(`requester_id.eq.${userId},fulfiller_id.eq.${userId}`)
     .order("started_at", { ascending: false });
 
   if (error || !trades) {
@@ -643,7 +645,7 @@ export async function getActiveUserTrades(): Promise<ActiveTradeItem[]> {
   }
 
   return trades.map((t) => {
-    const isRequester = t.requester_id === user.id;
+    const isRequester = t.requester_id === userId;
     const partnerData = isRequester ? t.fulfiller : t.requester;
     const partner = Array.isArray(partnerData) ? partnerData[0] : partnerData;
     const myConfirmed = isRequester ? t.requester_confirmed : t.fulfiller_confirmed;

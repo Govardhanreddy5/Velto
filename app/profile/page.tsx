@@ -50,8 +50,8 @@ export default async function ProfilePage() {
   const user = routing.user;
 
   const [tradeHistory, activeTrades] = await Promise.all([
-    getUserTradeHistory(),
-    getActiveUserTrades(),
+    getUserTradeHistory(user?.id),
+    getActiveUserTrades(user?.id),
   ]);
 
   const displayName = profile?.full_name || "Verified Student";

@@ -86,6 +86,11 @@ export function TradeChat({
     }
   }, [tradeId]);
 
+  const realtimeStatusRef = useRef(realtimeStatus);
+  useEffect(() => {
+    realtimeStatusRef.current = realtimeStatus;
+  }, [realtimeStatus]);
+
   // Set up Supabase Realtime channel for in-trade chat
   useEffect(() => {
     const supabase = createClient();
@@ -193,7 +198,7 @@ export function TradeChat({
 
     // 4. Fallback interval if realtime is offline or connecting
     const fallbackInterval = setInterval(() => {
-      if (realtimeStatus !== "connected") {
+      if (realtimeStatusRef.current !== "connected") {
         refreshMessages();
       }
     }, 6000);
@@ -207,7 +212,7 @@ export function TradeChat({
         supabase.removeChannel(channel);
       }
     };
-  }, [tradeId, currentUserId, partnerName, refreshMessages, realtimeStatus]);
+  }, [tradeId, currentUserId, partnerName, refreshMessages]);
 
 
   const handleSendMessage = async (e?: React.FormEvent) => {

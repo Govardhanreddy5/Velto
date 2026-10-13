@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { sendSelfTestPushToUser } from "@/lib/push/server";
 
 export interface PushSubscriptionData {
   endpoint: string;
@@ -48,12 +49,13 @@ export async function savePushSubscriptionAction(
     });
 
     if (error) {
+      console.error("[Velto Push Sub Save Error]:", error.message);
       return { success: false, message: error.message };
     }
 
     return {
       success: true,
-      message: "Push notifications successfully enabled!",
+      message: "Push notifications successfully enabled and saved!",
       isSubscribed: true,
     };
   } catch (err: unknown) {
@@ -108,7 +110,7 @@ export async function removePushSubscriptionAction(
 }
 
 /**
- * Server action to check if the current user has any active push subscriptions.
+ * Server action to check if the current user has any active push subscriptions stored in Supabase.
  */
 export async function getPushSubscriptionStatusAction(): Promise<{
   isSubscribed: boolean;
@@ -131,6 +133,7 @@ export async function getPushSubscriptionStatusAction(): Promise<{
     .from("push_subscriptions")
     .select("endpoint")
     .eq("user_id", user.id)
+    .order("updated_at", { ascending: false })
     .limit(1)
     .maybeSingle();
 
@@ -146,4 +149,29 @@ export async function getPushSubscriptionStatusAction(): Promise<{
  */
 export async function getVapidPublicKeyAction(): Promise<string> {
   return process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || "";
+}
+
+/**
+ * Server action for developer/diagnostic self-test push.
+ * Sends an immediate test notification to the calling user's registered device.
+ */
+export async function sendSelfTestPushAction(): Promise<{
+  success: boolean;
+  message: string;
+  statusCode?: number;
+}> {
+  const supabase = await createClient();
+  if (!supabase) {
+    return { success: false, message: "Database connection unavailable." };
+  }
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { success: false, message: "Authentication required." };
+  }
+
+  return await sendSelfTestPushToUser(user.id);
 }

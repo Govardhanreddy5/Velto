@@ -14,13 +14,28 @@ export function createClient() {
     return null;
   }
 
+  const clientConfig = {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true,
+      flowType: "pkce" as const,
+    },
+    cookieOptions: {
+      maxAge: 60 * 60 * 24 * 30, // 30-day persistent cookie
+      sameSite: "lax" as const,
+      path: "/",
+      secure: process.env.NODE_ENV === "production",
+    },
+  };
+
   if (typeof window !== "undefined") {
     if (!clientInstance) {
-      clientInstance = createBrowserClient(supabaseUrl, supabaseAnonKey);
+      clientInstance = createBrowserClient(supabaseUrl, supabaseAnonKey, clientConfig);
     }
     return clientInstance;
   }
 
-  return createBrowserClient(supabaseUrl, supabaseAnonKey);
+  return createBrowserClient(supabaseUrl, supabaseAnonKey, clientConfig);
 }
 

@@ -1,6 +1,6 @@
 // Velto Progressive Web App - Service Worker
-// Cache version: v2
-const CACHE_NAME = "velto-cache-v2";
+// Cache version: v4
+const CACHE_NAME = "velto-cache-v4";
 const OFFLINE_URL = "/offline";
 
 // Safe static assets to precache on install
@@ -22,12 +22,22 @@ function isExcludedFromCache(url, request) {
   if (urlObj.hostname.includes("supabase.co")) return true;
 
   // 2. Auth endpoints & session handling
-  if (urlObj.pathname.startsWith("/auth/")) return true;
+  if (urlObj.pathname === "/auth" || urlObj.pathname.startsWith("/auth")) return true;
   if (urlObj.pathname.startsWith("/api/")) return true;
   if (urlObj.pathname.includes("/rest/v1")) return true;
+  if (urlObj.pathname.includes("/auth/v1")) return true;
 
-  // 3. Trade rooms, live chats, user sensitive routes (network-first, no static cache persistence)
-  if (urlObj.pathname.startsWith("/trades/")) return true;
+  // 3. User session routes (strictly network-only; never cached)
+  if (
+    urlObj.pathname.startsWith("/dashboard") ||
+    urlObj.pathname.startsWith("/feed") ||
+    urlObj.pathname.startsWith("/profile") ||
+    urlObj.pathname.startsWith("/trades") ||
+    urlObj.pathname.startsWith("/requests") ||
+    urlObj.pathname.startsWith("/onboarding")
+  ) {
+    return true;
+  }
 
   // 4. Any request with Auth or API headers
   if (request && request.headers) {
@@ -136,19 +146,12 @@ self.addEventListener("fetch", (event) => {
   }
 
   // 3. Static application assets (_next/static, icons, images)
+  // Optimization: Next.js hashed assets in _next/static are immutable content-addressed chunks.
+  // Serve Cache-First without wasteful background network calls.
   if (isStaticAsset(url)) {
     event.respondWith(
       caches.match(request).then((cachedResponse) => {
         if (cachedResponse) {
-          fetch(request)
-            .then((networkResponse) => {
-              if (networkResponse && networkResponse.status === 200) {
-                caches.open(CACHE_NAME).then((cache) => {
-                  cache.put(request, networkResponse);
-                });
-              }
-            })
-            .catch(() => {});
           return cachedResponse;
         }
 
@@ -182,7 +185,6 @@ self.addEventListener("push", (event) => {
     }
   }
 
-  // Strict safe fallback parameters
   const title = payload.title || "New Velto exchange request";
   const body =
     payload.body ||

@@ -42,11 +42,19 @@ export async function checkUserRouting(): Promise<UserRoutingResult> {
   } = await supabase.auth.getUser();
 
   if (authError || !user || !user.email) {
+    const isSessionExpired =
+      authError?.message?.toLowerCase().includes("jwt") ||
+      authError?.message?.toLowerCase().includes("expired") ||
+      authError?.message?.toLowerCase().includes("session");
+
     return {
       status: "UNAUTHENTICATED",
-      destination: "/auth?mode=signin",
+      destination: isSessionExpired
+        ? "/auth?mode=signin&reason=session_expired"
+        : "/auth?mode=signin",
       user: null,
       profile: null,
+      message: isSessionExpired ? "Your session has expired. Please sign in again." : undefined,
     };
   }
 
