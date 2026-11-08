@@ -1,0 +1,24 @@
+{
+  "name": "velto-backend",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Supabase database migrations, SQL schemas, RLS policies, and verification test scripts for Velto",
+  "scripts": {
+    "test:milestone5": "node scripts/test_milestone5.js",
+    "test:milestone6": "node scripts/test_milestone6.js",
+    "test:milestone7": "node scripts/test_milestone7.js",
+    "test:milestone8": "node scripts/test_milestone8.js",
+    "test:milestone9": "node scripts/test_milestone9.js",
+    "test:milestone10": "node scripts/test_milestone10_concurrency_and_lifecycle.js",
+    "test:campus": "node scripts/test_campus_domain_enforcement.js",
+    "test:auth": "node scripts/test_auth_persistence.js",
+    "test:push": "node scripts/test_push_notifications.js",
+    "verify:e2e": "node scripts/verify_production_e2e.js",
+    "verify:cross-college": "node scripts/verify_cross_college_e2e.js"
+  },
+  "dependencies": {
+    "pg": "^8.23.0",
+    "web-push": "^3.6.7"
+  }
+}
+

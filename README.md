@@ -6,12 +6,79 @@ Velto is a campus-only peer-to-peer physical cash ↔ UPI marketplace built for 
 
 ---
 
+## Clean Project Architecture
+
+The codebase is organized into clear, dedicated top-level directories:
+
+```
+Velto/
+├── frontend/               # Full Next.js Web App, UI, Server Actions & PWA
+│   ├── app/                # Next.js App Router (pages, layout, routes)
+│   ├── components/         # Modular React UI components (auth, feed, trades, ui, etc.)
+│   ├── lib/                # Server Actions, Supabase client/server bindings, Web Push
+│   ├── public/             # Static assets, PWA icons, Service Worker
+│   ├── types/              # TypeScript database & authentication schemas
+│   ├── middleware.ts       # Session refresh and routing guards
+│   ├── next.config.ts      # Next.js configuration
+│   ├── postcss.config.mjs  # Tailwind CSS v4 setup
+│   ├── tsconfig.json       # Path aliases (@/* -> ./*)
+│   ├── .env.local          # Local environment variables
+│   └── package.json        # Frontend scripts and dependencies
+│
+├── backend/                # Database Migrations, SQL Schemas & Test Suites
+│   ├── supabase/           # 15 Chronological SQL migrations & base schema
+│   │   ├── migrations/
+│   │   └── schema.sql
+│   ├── scripts/            # Comprehensive automated verification suites
+│   ├── .env.local          # Database connection details
+│   ├── package.json        # Backend test runner configuration
+│   └── README.md           # Backend documentation & test commands
+│
+├── .gitignore              # Unified git exclusion rules
+├── package.json            # Root configuration with convenient workspace scripts
+├── tsconfig.json           # Root TypeScript configuration
+└── README.md               # Main project overview and setup instructions
+```
+
+---
+
+## Quick Start & Running Commands
+
+All commands can be run directly from the **project root**:
+
+```bash
+# Start frontend development server (http://localhost:3000)
+npm run dev
+
+# Run TypeScript typecheck across all files
+npm run typecheck
+
+# Build frontend for production
+npm run build
+
+# Run linting
+npm run lint
+
+# Run backend verification test suites
+npm run backend:test:campus
+npm run backend:test:auth
+npm run backend:test:push
+npm run backend:verify:e2e
+```
+
+Alternatively, you can work inside either directory individually:
+- `cd frontend && npm run dev`
+- `cd backend && npm run test:campus`
+
+---
+
 ## Technology Stack
 
-- **Framework**: [Next.js 16](https://nextjs.org/) (App Router, Server Actions, Turbopack)
+- **Frontend & App Engine**: [Next.js 16](https://nextjs.org/) (App Router, Server Actions, Turbopack)
 - **Language**: TypeScript (Strict mode)
-- **Styling**: Tailwind CSS & Lucide Icons
+- **Styling**: Tailwind CSS v4 & Lucide Icons
 - **Database & Auth**: [Supabase](https://supabase.com/) (PostgreSQL 15+, Row Level Security, Realtime WebSockets)
+- **Notifications**: Web Push API (RFC 8291 / VAPID compliant service worker)
 - **Hosting**: Vercel (Edge & Serverless Node.js runtime)
 
 ---
@@ -60,12 +127,15 @@ Required variables:
 | `NEXT_PUBLIC_SUPABASE_URL` | Your Supabase project URL | `https://xyzcompany.supabase.co` |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Public Supabase anon key (RLS protected) | `sb_publishable_...` |
 | `NEXT_PUBLIC_SITE_URL` | Site root URL for redirects | `http://localhost:3000` (local) or `https://velto.vercel.app` (prod) |
+| `NEXT_PUBLIC_VAPID_PUBLIC_KEY` | Web Push VAPID public key | `BEk4PRuGh...` |
+| `VAPID_PRIVATE_KEY` | Web Push VAPID private key (server-only) | `2CzXkk...` |
+| `VAPID_SUBJECT` | Web Push contact mailto URI | `mailto:support@velto.local` |
 
 ---
 
-## Supabase Database Migrations (In Execution Order)
+## Supabase Database Migrations
 
-All database schema, constraints, RLS policies, and RPC functions are organized in chronological forward-only migration scripts in [`supabase/migrations/`](./supabase/migrations/):
+All database schema, constraints, RLS policies, and RPC functions are organized in chronological forward-only migration scripts in [`backend/supabase/migrations/`](./backend/supabase/migrations/):
 
 1. `01_foundation_schema.sql`: Base profiles, requests, trades, ratings, safety reports, RLS.
 2. `02_canonical_request_types.sql`: Aligns trade type enum values with canonical types.
@@ -80,71 +150,5 @@ All database schema, constraints, RLS policies, and RPC functions are organized 
 11. `11_admin_full_access.sql`: Campus administrator moderation policies and trade visibility.
 12. `12_safety_reports_admin_policy.sql`: Admin policy for reviewing student safety reports.
 13. `13_auth_hook_and_campus_domains.sql`: `Before User Created` Auth Hook restricting signups strictly to `@vishnu.edu.in` and `@svecw.edu.in`, automatic campus assignment, and RLS campus feed isolation.
-
----
-
-## How to Promote the First Campus Administrator
-
-By default, all registered students have `is_admin = FALSE`. Non-admins accessing `/admin` receive a standard `404 Not Found` response.
-
-To promote an initial authorized student to an administrator:
-1. Open your Supabase Dashboard -> **SQL Editor**.
-2. Run:
-```sql
-UPDATE public.profiles
-SET is_admin = TRUE
-WHERE email = 'your_college_email@vishnu.edu.in'; -- or your_college_email@svecw.edu.in
-```
-3. That user will now see the **Admin Console** badge in their profile/dashboard and can access `/admin`.
-
----
-
-## Automated Test Suites
-
-Run test suites directly using Node.js against your Supabase instance:
-
-```bash
-# Milestone 7: Two-sided trade settlement & completion tests (12 tests)
-$env:NODE_PATH="node_modules"; node scripts/test_milestone7.js
-
-# Milestone 8: Ratings, reputation calculation & constraints (16 tests)
-$env:NODE_PATH="node_modules"; node scripts/test_milestone8.js
-
-# Milestone 9: Reporting, dispute resolution & admin moderation (24 tests)
-$env:NODE_PATH="node_modules"; node scripts/test_milestone9.js
-
-# Milestone 10: Full lifecycle, critical concurrency race & edge cases (23 tests)
-$env:NODE_PATH="node_modules"; node scripts/test_milestone10_concurrency_and_lifecycle.js
-```
-
----
-
-## Deployment Guide (Vercel)
-
-### 1. Supabase Dashboard Settings
-1. Navigate to **Authentication** -> **URL Configuration**:
-   - **Site URL**: `https://your-app.vercel.app`
-   - **Redirect URLs**: Add `https://your-app.vercel.app/auth/callback` and `http://localhost:3000/auth/callback`.
-2. Navigate to **Database** -> **Replication**:
-   - Ensure `exchange_requests` and `trade_messages` are in `supabase_realtime` publication.
-
-### 2. Vercel Deployment
-1. Connect your GitHub repository to Vercel.
-2. In **Environment Variables**, add:
-   - `NEXT_PUBLIC_SUPABASE_URL`
-   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-   - `NEXT_PUBLIC_SITE_URL` = `https://your-app.vercel.app`
-3. Click **Deploy**. Next.js Turbopack will compile all static and dynamic routes.
-
----
-
-## Small Real-World Pilot Launch Checklist (20–50 Students)
-
-- [x] **Zero Secrets in Repository**: No private service-role keys or `.env` files committed.
-- [x] **Database Constraints**: Request amounts strictly enforced between ₹20 and ₹500.
-- [x] **Race Condition Guard**: Atomic request acceptance verified under concurrent traffic.
-- [x] **Private Data Isolation**: Student UPI IDs, personal emails, and chat logs protected by RLS.
-- [x] **Anti-Privilege Escalation**: Trigger prevents users from making themselves administrators or unbanning accounts.
-- [x] **Real-time Synchronization**: Supabase Realtime enabled for feed updates and in-trade chat.
-- [x] **Dispute Resolution**: Active and completed trades support immediate issue reporting to campus admins.
-- [x] **Designated Safe Meetup Spots**: Prominently display public campus spots (e.g. Canteen, Central Library Desk).
+14. `14_shared_community_and_search.sql`: Shared community feed across partner campuses.
+15. `15_push_notifications.sql`: Web Push subscription schema, RLS, and delivery tracking.

@@ -36,7 +36,10 @@ async function runPushNotificationTestSuite() {
   webpush.setVapidDetails(vapidKeys.subject, vapidKeys.publicKey, vapidKeys.privateKey);
 
   // 2. Service Worker push and notificationclick handling check
-  const swContent = fs.readFileSync(path.join(__dirname, '../public/sw.js'), 'utf8');
+  const swPath = fs.existsSync(path.join(__dirname, '../../frontend/public/sw.js'))
+    ? path.join(__dirname, '../../frontend/public/sw.js')
+    : path.join(__dirname, '../public/sw.js');
+  const swContent = fs.readFileSync(swPath, 'utf8');
   assert(swContent.includes('self.addEventListener("push"'), "Service worker has 'push' event listener");
   assert(swContent.includes('self.addEventListener("notificationclick"'), "Service worker has 'notificationclick' listener");
   assert(swContent.includes('self.registration.showNotification'), "Service worker invokes showNotification");

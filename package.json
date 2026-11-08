@@ -2,11 +2,21 @@
   "name": "velto",
   "version": "0.1.0",
   "private": true,
+  "workspaces": [
+    "frontend",
+    "backend"
+  ],
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "eslint"
+    "dev": "npm --prefix frontend run dev",
+    "build": "npm --prefix frontend run build",
+    "start": "npm --prefix frontend run start",
+    "lint": "npm --prefix frontend run lint",
+    "typecheck": "npm --prefix frontend run typecheck",
+    "backend:test:campus": "npm --prefix backend run test:campus",
+    "backend:test:auth": "npm --prefix backend run test:auth",
+    "backend:test:push": "npm --prefix backend run test:push",
+    "backend:verify:e2e": "npm --prefix backend run verify:e2e",
+    "backend:verify:cross-college": "npm --prefix backend run verify:cross-college"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",

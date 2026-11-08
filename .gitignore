@@ -2,6 +2,7 @@
 
 # dependencies
 /node_modules
+*/node_modules
 /.pnp
 .pnp.*
 .yarn/*
@@ -15,6 +16,7 @@
 
 # next.js
 /.next/
+frontend/.next/
 /out/
 
 # production
@@ -35,6 +37,8 @@ yarn-error.log*
 !.env.example
 .env.local
 .env
+frontend/.env.local
+backend/.env.local
 
 # vercel
 .vercel
@@ -42,3 +46,4 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+frontend/next-env.d.ts

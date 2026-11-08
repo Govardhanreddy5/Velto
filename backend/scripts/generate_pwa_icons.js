@@ -2,7 +2,10 @@ const fs = require('fs');
 const path = require('path');
 const sharp = require('sharp');
 
-const iconsDir = path.join(__dirname, '..', 'public', 'icons');
+const publicDir = fs.existsSync(path.join(__dirname, '../../frontend/public'))
+  ? path.join(__dirname, '../../frontend/public')
+  : path.join(__dirname, '..', 'public');
+const iconsDir = path.join(publicDir, 'icons');
 if (!fs.existsSync(iconsDir)) {
   fs.mkdirSync(iconsDir, { recursive: true });
 }
@@ -121,7 +124,7 @@ async function generate() {
   // 5. apple-touch-icon.png (180x180)
   await sharp(stdSvg).resize(180, 180).png().toFile(path.join(iconsDir, 'apple-touch-icon.png'));
   // Also place apple-touch-icon in public root for crawlers that check /apple-touch-icon.png
-  await sharp(stdSvg).resize(180, 180).png().toFile(path.join(__dirname, '..', 'public', 'apple-touch-icon.png'));
+  await sharp(stdSvg).resize(180, 180).png().toFile(path.join(publicDir, 'apple-touch-icon.png'));
   console.log('Generated apple-touch-icon.png');
 
   // 6. favicon-32x32.png and favicon-16x16.png
